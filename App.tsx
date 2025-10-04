@@ -129,7 +129,7 @@ const App: React.FC = () => {
     };
 
     const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse, currentEventLog: string[]) => {
-        const gameData: SavedGameData = { stats: currentStats, turnData, eventLog: currentEventLog };
+        const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog };
         localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
         setHasSaveGame(true);
     };
