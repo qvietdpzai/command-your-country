@@ -17,9 +17,9 @@ const StatBar: React.FC<{ value: number; icon: 'military' | 'economy' | 'morale'
     const barColor = value > 60 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500';
 
     return (
-        <div className="flex items-center gap-3 w-full">
+        <div className="flex items-center gap-3 w-full" aria-label={`${label}: ${value}`}>
             <Icon name={icon} className="w-6 h-6 text-gray-400 flex-shrink-0" />
-            <div className="w-full bg-gray-700 rounded-full h-4">
+            <div className="w-full bg-gray-700 rounded-full h-4" title={`${label}: ${value}`}>
                 <div
                     className={`${barColor} h-4 rounded-full transition-all duration-500 ease-in-out`}
                     style={{ width: `${percentage}%` }}
