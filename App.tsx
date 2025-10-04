@@ -1,0 +1,386 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { getNextTurn, generateNationalEmblem } from './services/geminiService';
+import { GameStats, TurnResponse } from './types';
+import { Icon } from './components/icons';
+import { TerritoryMap } from './components/TerritoryMap';
+import { NationalEmblem } from './components/NationalEmblem';
+import { soundService, SoundName } from './services/soundService';
+
+const INITIAL_STATS: GameStats = { military: 70, economy: 70, morale: 70, territoryControl: 50, policies: [], nationName: '', emblemImageUrl: null };
+const MAX_STATS = 100;
+const SAVE_GAME_KEY = 'ww3-savegame';
+
+type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
+
+const StatBar: React.FC<{ value: number; icon: 'military' | 'economy' | 'morale'; label: string }> = ({ value, icon, label }) => {
+    const percentage = (value / MAX_STATS) * 100;
+    const barColor = value > 60 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500';
+
+    return (
+        <div className="flex items-center gap-3 w-full">
+            <Icon name={icon} className="w-6 h-6 text-gray-400 flex-shrink-0" />
+            <div className="w-full bg-gray-700 rounded-full h-4">
+                <div
+                    className={`${barColor} h-4 rounded-full transition-all duration-500 ease-in-out`}
+                    style={{ width: `${percentage}%` }}
+                ></div>
+            </div>
+            <span className="text-lg font-bold text-white w-12 text-right">{value}</span>
+        </div>
+    );
+};
+
+interface SavedGameData {
+    stats: GameStats;
+    turnData: TurnResponse;
+    eventLog: string[];
+}
+
+const App: React.FC = () => {
+    const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
+    const [turnData, setTurnData] = useState<TurnResponse | null>(null);
+    const [eventLog, setEventLog] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [gameState, setGameState] = useState<GameState>('menu');
+    const [gameOverMessage, setGameOverMessage] = useState('');
+    const [playerInput, setPlayerInput] = useState('');
+    const [tempNationName, setTempNationName] = useState('');
+    const [hasSaveGame, setHasSaveGame] = useState(false);
+    const audioInitialized = useRef(false);
+
+    useEffect(() => {
+        const savedGame = localStorage.getItem(SAVE_GAME_KEY);
+        if (savedGame) {
+            setHasSaveGame(true);
+        }
+    }, []);
+
+    const initializeAudio = () => {
+        if (!audioInitialized.current) {
+            soundService.init();
+            audioInitialized.current = true;
+        }
+    };
+
+    const playSoundWithInit = (sound: SoundName) => {
+        initializeAudio();
+        soundService.playSound(sound);
+    };
+
+    const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse, currentEventLog: string[]) => {
+        const gameData: SavedGameData = {
+            stats: currentStats,
+            turnData: currentTurnData,
+            eventLog: currentEventLog,
+        };
+        localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
+        setHasSaveGame(true);
+    };
+    
+    const clearSaveGame = () => {
+        localStorage.removeItem(SAVE_GAME_KEY);
+        setHasSaveGame(false);
+    };
+
+    const loadGame = () => {
+        playSoundWithInit('ui_click');
+        const savedGameString = localStorage.getItem(SAVE_GAME_KEY);
+        if (savedGameString) {
+            const savedGame: SavedGameData = JSON.parse(savedGameString);
+            setStats(savedGame.stats);
+            setTurnData(savedGame.turnData);
+            setEventLog(savedGame.eventLog);
+            setGameState('playing');
+        }
+    };
+
+    const handleNationCreation = useCallback(async () => {
+        if (!tempNationName.trim() || isLoading) return;
+    
+        playSoundWithInit('start_game');
+        clearSaveGame();
+        setIsLoading(true);
+        setGameState('playing');
+        setEventLog([]);
+        setPlayerInput('');
+    
+        // Set initial stats with name, but emblem is loading
+        let currentStats: GameStats = {
+            ...INITIAL_STATS,
+            nationName: tempNationName,
+            emblemImageUrl: null, // Starts as null
+        };
+        setStats(currentStats);
+        
+        // Fetch emblem and first turn in parallel
+        const [emblemUrl, initialTurn] = await Promise.all([
+            generateNationalEmblem(tempNationName),
+            getNextTurn(currentStats, null)
+        ]);
+    
+        // Update stats with the generated emblem and policies from the first turn
+        currentStats = {
+            ...currentStats,
+            emblemImageUrl: emblemUrl,
+            policies: [initialTurn.policySummary],
+        };
+        setStats(currentStats);
+        setTurnData(initialTurn);
+    
+        const newLog = [initialTurn.outcome];
+        setEventLog(newLog);
+    
+        saveGame(currentStats, initialTurn, newLog);
+        setIsLoading(false);
+        playSoundWithInit('receive_response');
+    }, [tempNationName, isLoading]);
+
+    const resetGame = () => {
+        playSoundWithInit('ui_click');
+        clearSaveGame();
+        setGameState('menu');
+        setTurnData(null);
+        setEventLog([]);
+        setTempNationName('');
+    }
+
+    const handleAction = useCallback(async () => {
+        if (isLoading || gameState !== 'playing' || !playerInput.trim()) return;
+
+        playSoundWithInit('send_command');
+        setIsLoading(true);
+        const actionToSubmit = playerInput;
+        const newEventLog = [`> ${actionToSubmit}`, ...eventLog];
+        setEventLog(newEventLog);
+
+        const nextTurnData = await getNextTurn(stats, actionToSubmit);
+
+        if (nextTurnData.outcome.startsWith("Lỗi")) {
+            setTurnData(nextTurnData);
+            setEventLog(prev => [nextTurnData.outcome, ...prev]);
+            setIsLoading(false);
+            playSoundWithInit('stat_decrease');
+            return;
+        }
+        
+        playSoundWithInit('receive_response');
+        setPlayerInput('');
+
+        const { military, economy, morale, territoryControlChange } = nextTurnData.statChanges;
+        if (military > 0 || economy > 0 || morale > 0 || territoryControlChange > 0) {
+            setTimeout(() => playSoundWithInit('stat_increase'), 200);
+        } else if (military < 0 || economy < 0 || morale < 0 || territoryControlChange < 0) {
+            setTimeout(() => playSoundWithInit('stat_decrease'), 200);
+        }
+
+        const newStats: GameStats = {
+            ...stats,
+            military: Math.max(0, Math.min(MAX_STATS, stats.military + military)),
+            economy: Math.max(0, Math.min(MAX_STATS, stats.economy + economy)),
+            morale: Math.max(0, Math.min(MAX_STATS, stats.morale + morale)),
+            territoryControl: Math.max(0, Math.min(MAX_STATS, stats.territoryControl + territoryControlChange)),
+            policies: [nextTurnData.policySummary, ...stats.policies],
+        };
+
+        setStats(newStats);
+        setTurnData(nextTurnData);
+        const finalEventLog = [nextTurnData.outcome, ...newEventLog];
+        setEventLog(finalEventLog);
+        setIsLoading(false);
+
+        if (newStats.military <= 0 && newStats.economy <= 0 && newStats.morale <= 0) {
+            setGameState('gameOver');
+            setGameOverMessage("Quốc gia của bạn đã hoàn toàn sụp đổ. Quân đội tan rã, kinh tế kiệt quệ, và người dân mất hết niềm tin. Thất bại toàn diện.");
+            clearSaveGame();
+            playSoundWithInit('game_over');
+        } else {
+            saveGame(newStats, nextTurnData, finalEventLog);
+        }
+    }, [isLoading, stats, playerInput, eventLog, gameState]);
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        handleAction();
+    };
+    
+    const renderContent = () => {
+        switch (gameState) {
+            case 'menu':
+                return (
+                    <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
+                        <h1 className="text-5xl font-bold bg-gradient-to-r from-red-500 to-yellow-400 text-transparent bg-clip-text mb-4">WW3: Xung đột toàn cầu</h1>
+                        <p className="text-gray-400 mb-8 max-w-sm">Bạn là nhà lãnh đạo tối cao. Mỗi quyết định đều có thể dẫn đến chiến thắng hoặc thất bại.</p>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            {hasSaveGame && (
+                                <button
+                                    onClick={loadGame}
+                                    className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
+                                >
+                                    <Icon name="load" className="w-6 h-6"/>
+                                    Tiếp tục chiến dịch
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    playSoundWithInit('ui_click');
+                                    setGameState('naming');
+                                }}
+                                className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"
+                            >
+                                <Icon name="play" className="w-6 h-6"/>
+                                {hasSaveGame ? 'Chiến dịch mới' : 'Bắt đầu chiến dịch'}
+                            </button>
+                        </div>
+                    </div>
+                );
+            
+            case 'naming':
+                return (
+                    <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
+                        <h2 className="text-3xl font-bold text-gray-200 mb-4">Đặt tên cho quốc gia của bạn</h2>
+                        <p className="text-gray-400 mb-8 max-w-md">Tên quốc gia sẽ định hình vận mệnh và biểu tượng của dân tộc bạn.</p>
+                        <form onSubmit={(e) => { e.preventDefault(); handleNationCreation(); }} className="w-full max-w-sm flex flex-col gap-4">
+                            <input
+                                type="text"
+                                value={tempNationName}
+                                onChange={(e) => setTempNationName(e.target.value)}
+                                placeholder="Ví dụ: Cộng hòa Astoria"
+                                className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center text-xl"
+                                autoFocus
+                            />
+                            <button
+                                type="submit"
+                                disabled={!tempNationName.trim()}
+                                className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Icon name="play" className="w-6 h-6"/>
+                                Bắt đầu
+                            </button>
+                        </form>
+                     </div>
+                );
+
+            case 'gameOver':
+                return (
+                    <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
+                        <h2 className="text-3xl font-bold text-red-500 mb-4">TRÒ CHƠI KẾT THÚC</h2>
+                        <p className="text-gray-300 mb-8 max-w-md">{gameOverMessage}</p>
+                        <button
+                            onClick={resetGame}
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105"
+                        >
+                            <Icon name="refresh" className="w-5 h-5"/>
+                            Chơi lại
+                        </button>
+                    </div>
+                );
+            
+            case 'playing':
+                return (
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        {/* Left Panels */}
+                        <div className="lg:col-span-2 flex flex-col gap-6">
+                            <div className="bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
+                                <NationalEmblem 
+                                    nationName={stats.nationName}
+                                    imageUrl={stats.emblemImageUrl}
+                                    isLoading={isLoading && !stats.emblemImageUrl}
+                                />
+                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 -mt-2">TRẠNG THÁI QUỐC GIA</h2>
+                                <StatBar value={stats.military} icon="military" label="Quân sự" />
+                                <StatBar value={stats.economy} icon="economy" label="Kinh tế" />
+                                <StatBar value={stats.morale} icon="morale" label="Tinh thần" />
+                                <TerritoryMap percentage={stats.territoryControl} />
+                            </div>
+                            <div className="bg-black/30 p-4 rounded-lg border border-gray-700">
+                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-3 flex items-center justify-center gap-2"><Icon name="policy" />HỌC THUYẾT QUỐC GIA</h2>
+                                <ul className="space-y-2 text-sm text-gray-400 max-h-48 overflow-y-auto pr-2">
+                                    {stats.policies.map((policy, index) => (
+                                        <li key={index} className="bg-gray-900/50 p-2 rounded border-l-2 border-green-500">{policy}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* Right Panel: Game */}
+                        <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">
+                            <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-2">TRUNG TÂM CHỈ HUY</h2>
+                            <div className="font-mono bg-black/50 p-3 rounded h-40 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
+                                <div>
+                                    {eventLog.map((event, index) => (
+                                        <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : event.startsWith('Lỗi:') ? 'text-yellow-400' : 'text-gray-300'}>{event}</p>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {isLoading ? (
+                                <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
+                                    <svg className="animate-spin h-8 w-8 text-white mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Đang xử lý diễn biến...
+                                </div>
+                            ) : (
+                                <div className="flex-grow flex flex-col">
+                                    <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4">
+                                        <h3 className="font-bold text-yellow-400 text-sm mb-1 flex items-center gap-2"><Icon name="warning" className="w-4 h-4" />BÁO CÁO THIỆT HẠI</h3>
+                                        <p className="text-gray-300 text-sm">{turnData?.damageReport}</p>
+                                    </div>
+                                    <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-4">
+                                        <h3 className="font-bold text-gray-400 text-sm mb-1">TÌNH BÁO TOÀN CẦU</h3>
+                                        <p className="text-gray-300 text-sm">{turnData?.worldStatus}</p>
+                                    </div>
+                                    <p className="text-green-300 mb-4 text-lg flex-grow">{turnData?.scenario}</p>
+                                    <form onSubmit={handleFormSubmit} className="mt-auto">
+                                        <label htmlFor="player-action" className="sr-only">Hành động của bạn</label>
+                                        <div className="flex items-center gap-2 bg-black/50 border border-gray-600 rounded-lg p-2 focus-within:ring-2 focus-within:ring-green-500">
+                                            <span className="font-mono text-cyan-400 pl-2">{'>'}</span>
+                                            <textarea
+                                                id="player-action"
+                                                value={playerInput}
+                                                onChange={(e) => setPlayerInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAction(); }
+                                                }}
+                                                placeholder="Nhập mệnh lệnh của bạn ở đây..."
+                                                className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500 resize-none"
+                                                rows={2}
+                                                disabled={isLoading}
+                                                autoFocus
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={isLoading || !playerInput.trim()}
+                                                className="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed self-end"
+                                                aria-label="Gửi mệnh lệnh"
+                                            >
+                                                <Icon name="send" className="w-5 h-5"/>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+        }
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 selection:bg-green-500 selection:text-black">
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-gray-900 via-gray-900 to-black z-0 opacity-80"></div>
+            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/black-felt.png')] opacity-10 z-0"></div>
+            
+            <main className="w-full max-w-6xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700">
+                {renderContent()}
+            </main>
+
+            <footer className="absolute bottom-4 text-center text-gray-600 text-xs z-10">
+                <p>Một trải nghiệm chiến lược được cung cấp bởi Google Gemini API.</p>
+            </footer>
+        </div>
+    );
+};
+
+export default App;

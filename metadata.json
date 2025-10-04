@@ -1,0 +1,5 @@
+{
+  "name": "WW3: Global Conflict",
+  "description": "Một trò chơi chiến lược dựa trên văn bản, nơi các quyết định của bạn định hình số phận của quốc gia trong bối cảnh xung đột toàn cầu. Được cung cấp bởi Google Gemini API.",
+  "requestFramePermissions": []
+}
