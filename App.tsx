@@ -1,10 +1,25 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getNextTurn, generateNationalEmblem } from './services/geminiService';
-import { GameStats, MilitaryStats, TurnResponse } from './types';
+import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID, FactionID } from './types';
 import { Icon } from './components/icons';
-import { TerritoryMap } from './components/TerritoryMap';
+import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { soundService, SoundName } from './services/soundService';
+
+const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
+
+const createInitialMap = (): WorldMap => {
+    const map: Partial<WorldMap> = {};
+    REGIONS.forEach(region => {
+        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false };
+    });
+    // Assign starting territories
+    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true };
+    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false };
+    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false };
+    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false };
+    return map as WorldMap;
+};
 
 const INITIAL_STATS: GameStats = { 
     military: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 },
@@ -12,13 +27,13 @@ const INITIAL_STATS: GameStats = {
     manpower: 10000000,
     morale: 70, 
     diplomacy: 60, 
-    territoryControl: 50, 
+    worldMap: createInitialMap(), 
     policies: [], 
     nationName: '', 
     emblemImageUrl: null 
 };
 const MAX_MORALE_DIPLOMACY = 100;
-const SAVE_GAME_KEY = 'ww3-savegame-v2'; // New key for new data structure
+const SAVE_GAME_KEY = 'ww3-savegame-v3'; // New key for map structure
 
 type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
@@ -129,6 +144,7 @@ const App: React.FC = () => {
     };
 
     const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse, currentEventLog: string[]) => {
+        if (!currentTurnData) return;
         const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog };
         localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
         setHasSaveGame(true);
@@ -145,8 +161,8 @@ const App: React.FC = () => {
         if (savedGameString) {
             try {
                 const savedGame: SavedGameData = JSON.parse(savedGameString);
-                // Basic validation for new structure
-                if (savedGame.stats.military && typeof savedGame.stats.military.infantry !== 'undefined') {
+                // Basic validation for new map structure
+                if (savedGame.stats.worldMap && savedGame.stats.worldMap.north_america) {
                     setStats(savedGame.stats);
                     setTurnData(savedGame.turnData);
                     setEventLog(savedGame.eventLog);
@@ -195,6 +211,7 @@ const App: React.FC = () => {
     const resetGame = () => {
         playSoundWithInit('ui_click');
         clearSaveGame();
+        setStats(INITIAL_STATS);
         setGameState('menu');
         setTurnData(null);
         setEventLog([]);
@@ -211,20 +228,13 @@ const App: React.FC = () => {
         setEventLog(newEventLog);
 
         const nextTurnData = await getNextTurn(stats, actionToSubmit);
-
-        if (nextTurnData.outcome.startsWith("Lỗi")) {
-            setTurnData(nextTurnData);
-            setEventLog(prev => [nextTurnData.outcome, ...prev]);
-            setIsLoading(false);
-            playSoundWithInit('stat_decrease');
-            return;
-        }
         
         playSoundWithInit('receive_response');
         setPlayerInput('');
 
         const changes = nextTurnData.statChanges;
-        const totalChangeValue = Object.values(changes.military).reduce((a, b) => a + b, 0) + changes.economy + changes.manpower + changes.morale + changes.diplomacy + changes.territoryControlChange;
+        const totalMilitaryChange = Object.values(changes.military).reduce((a, b) => a + (b || 0), 0);
+        const totalChangeValue = totalMilitaryChange + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
         if (totalChangeValue > 0) setTimeout(() => playSoundWithInit('stat_increase'), 200);
         else if (totalChangeValue < 0) setTimeout(() => playSoundWithInit('stat_decrease'), 200);
 
@@ -234,6 +244,22 @@ const App: React.FC = () => {
             newMilitary[unit] = Math.max(0, (newMilitary[unit] || 0) + (changes.military[unit] || 0));
         }
 
+        const newWorldMap = { ...stats.worldMap };
+        changes.mapChanges.forEach(change => {
+            if (newWorldMap[change.region]) {
+                if (change.newController) {
+                    newWorldMap[change.region].controlledBy = change.newController;
+                }
+                if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === true) {
+                    // Move military presence to the new region
+                    REGIONS.forEach(r => newWorldMap[r].hasPlayerMilitary = false);
+                    newWorldMap[change.region].hasPlayerMilitary = true;
+                } else if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === false) {
+                     newWorldMap[change.region].hasPlayerMilitary = false;
+                }
+            }
+        });
+
         const newStats: GameStats = {
             ...stats,
             military: newMilitary,
@@ -241,7 +267,7 @@ const App: React.FC = () => {
             manpower: Math.max(0, stats.manpower + changes.manpower),
             morale: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.morale + changes.morale)),
             diplomacy: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.diplomacy + changes.diplomacy)),
-            territoryControl: Math.max(0, Math.min(100, stats.territoryControl + changes.territoryControlChange)),
+            worldMap: newWorldMap,
             policies: [nextTurnData.policySummary, ...stats.policies],
         };
 
@@ -251,10 +277,10 @@ const App: React.FC = () => {
         setEventLog(finalEventLog);
         setIsLoading(false);
 
-        const totalMilitary = Object.values(newStats.military).reduce((sum, count) => sum + count, 0);
-        if (newStats.territoryControl <= 0 || (totalMilitary <= 0 && newStats.economy <= 0)) {
+        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player');
+        if (!playerHasTerritory) {
             setGameState('gameOver');
-            setGameOverMessage("Quốc gia của bạn đã hoàn toàn sụp đổ. Lãnh thổ bị chiếm đóng, quân đội tan rã và kinh tế kiệt quệ. Thất bại toàn diện.");
+            setGameOverMessage("Bạn đã mất quyền kiểm soát tất cả các vùng lãnh thổ. Quốc gia của bạn đã bị xóa sổ khỏi bản đồ thế giới.");
             clearSaveGame();
             playSoundWithInit('game_over');
         } else {
@@ -332,7 +358,7 @@ const App: React.FC = () => {
                                     <MoraleDiplomacyBar value={stats.morale} icon="morale" label="Tinh thần" />
                                     <MoraleDiplomacyBar value={stats.diplomacy} icon="diplomacy" label="Ngoại giao" />
                                 </div>
-                                <TerritoryMap percentage={stats.territoryControl} />
+                                <WorldMapComponent mapData={stats.worldMap} />
                             </div>
                             <div className="bg-black/30 p-4 rounded-lg border border-gray-700">
                                 <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-3 flex items-center justify-center gap-2"><Icon name="policy" />HỌC THUYẾT QUỐC GIA</h2>

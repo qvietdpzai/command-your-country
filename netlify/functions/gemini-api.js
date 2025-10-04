@@ -5,6 +5,13 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.
 
+HỆ THỐNG BẢN ĐỒ VÀ LÃNH THỔ:
+-   Trò chơi diễn ra trên một bản đồ thế giới được chia thành các khu vực chiến lược.
+-   Mỗi khu vực được kiểm soát bởi một phe: 'player' (người chơi), 'eastern_alliance' (Liên minh Phương Đông), 'western_alliance' (Liên minh Phương Tây), hoặc 'neutral' (trung lập).
+-   Sự hiện diện quân sự của người chơi ('hasPlayerMilitary') được đánh dấu trên một khu vực. Quân đội của người chơi chỉ có thể ở một khu vực tại một thời điểm. Di chuyển quân đội có nghĩa là đặt 'hasPlayerMilitary' thành true ở khu vực mới và false ở khu vực cũ.
+-   Các thay đổi trên bản đồ (chiếm lãnh thổ, di chuyển quân) phải được trả về trong 'mapChanges'.
+-   Các hành động và sự kiện phải có logic về mặt địa lý. Ví dụ: tấn công 'western_europe' từ 'east_asia' là không hợp lý nếu không có lực lượng hải quân hoặc căn cứ ở gần đó.
+
 HỆ THỐNG CHỈ SỐ CHI TIẾT:
 -   Kinh tế (economy): GDP của quốc gia, tính bằng Tỷ USD. Thay đổi phải hợp lý (ví dụ: -50, +20).
 -   Nhân lực (manpower): Dân số sẵn sàng cho quân đội và công nghiệp.
@@ -16,14 +23,13 @@ HỆ THỐNG CHỈ SỐ CHI TIẾT:
 -   Tinh thần (morale) & Ngoại giao (diplomacy): Thang điểm 0-100.
 
 QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
-1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC (dẫn đến thiệt hại quân sự hoặc kinh tế) chỉ có thể xảy ra nếu có lý do chính đáng.
-2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn gần đây của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế nghiêm trọng. (D) Căng thẳng thế giới leo thang.
-3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:' và PHẢI nêu rõ lý do. Ví dụ: 'Báo động đỏ: Do các cuộc tập trận khiêu khích của bạn, Liên minh Phương Đông đã tiến hành không kích, phá hủy 25 máy bay và 50 xe tăng.' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
+1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC chỉ có thể xảy ra nếu có lý do chính đáng.
+2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế. (D) Căng thẳng thế giới leo thang.
+3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:', nêu rõ lý do VÀ khu vực bị ảnh hưởng. Ví dụ: 'Báo động đỏ: Do các cuộc tập trận khiêu khích của bạn ở Đông Âu, Liên minh Phương Đông đã tiến hành không kích vào khu vực này, phá hủy 25 máy bay và 50 xe tăng.' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
 
 CÁC QUY TẮC KHÁC:
--   **THẾ GIỚI SỐNG ĐỘNG:** Thế giới không chỉ xoay quanh người chơi. Các quốc gia và liên minh NPC khác có thể và NÊN tương tác với nhau, bao gồm cả việc gây chiến với nhau nếu có lý do địa chính trị hợp lệ. Hãy báo cáo những sự kiện quan trọng này trong 'worldStatus' để người chơi biết.
+-   **THẾ GIỚI SỐNG ĐỘNG:** Thế giới không chỉ xoay quanh người chơi. Các quốc gia và liên minh NPC khác có thể và NÊN tương tác với nhau trên bản đồ. Một cuộc chiến giữa các NPC có thể dẫn đến thay đổi quyền kiểm soát lãnh thổ. Hãy báo cáo những sự kiện này trong 'worldStatus'.
 -   Tạo ra các kết quả và kịch bản đẩy căng thẳng leo thang một cách logic.
--   Thiệt hại và tăng trưởng phải được phản ánh bằng những con số cụ thể trong statChanges. Ví dụ, xây dựng nhà máy có thể tăng 'economy', tuyển quân tăng 'infantry' nhưng giảm 'manpower' và 'economy'.
 -   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.`;
 
 const responseSchema = {
@@ -54,9 +60,21 @@ const responseSchema = {
                 manpower: { type: 'INTEGER', description: 'Thay đổi chỉ số nhân lực.' },
                 morale: { type: 'INTEGER', description: 'Thay đổi chỉ số tinh thần (thang 0-100).' },
                 diplomacy: { type: 'INTEGER', description: 'Thay đổi chỉ số ngoại giao (thang 0-100).' },
-                territoryControlChange: { type: 'INTEGER', description: 'Thay đổi chỉ số kiểm soát lãnh thổ (%).' }
+                mapChanges: {
+                    type: 'ARRAY',
+                    description: "Danh sách các thay đổi trên bản đồ thế giới. Chỉ bao gồm các khu vực bị ảnh hưởng.",
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            region: { type: 'STRING', description: "ID của khu vực bị thay đổi (ví dụ: 'western_europe')." },
+                            newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'eastern_alliance')." },
+                            playerMilitary: { type: 'BOOLEAN', description: "Sự hiện diện quân sự của người chơi (true: có, false: không)." }
+                        },
+                        required: ['region']
+                    }
+                }
             },
-            required: ['military', 'economy', 'manpower', 'morale', 'diplomacy', 'territoryControlChange']
+            required: ['military', 'economy', 'manpower', 'morale', 'diplomacy', 'mapChanges']
         },
         policySummary: {
             type: 'STRING',
@@ -88,7 +106,7 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
           - Không quân: ${currentStats.military.airforce}
         - Tinh thần: ${currentStats.morale}/100
         - Ngoại giao: ${currentStats.diplomacy}/100
-        - Kiểm soát Lãnh thổ: ${currentStats.territoryControl}%
+        - Bản đồ thế giới (JSON): ${JSON.stringify(currentStats.worldMap)}
 
         Hành động cuối cùng của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}
 
