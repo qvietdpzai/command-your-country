@@ -275,6 +275,7 @@ const App: React.FC = () => {
             economicGrowth: stats.economicGrowth + changes.economicGrowth,
             worldMap: newWorldMap,
             policies: [nextTurnData.policySummary, ...stats.policies],
+            allianceName: nextTurnData.allianceName || stats.allianceName,
         };
 
         setStats(newStats);
@@ -283,7 +284,7 @@ const App: React.FC = () => {
         setEventLog(finalEventLog);
         setIsLoading(false);
 
-        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player');
+        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player' || r.controlledBy === 'player_alliance');
         if (!playerHasTerritory) {
             setGameState('gameOver');
             setGameOverMessage("Bạn đã mất quyền kiểm soát tất cả các vùng lãnh thổ. Quốc gia của bạn đã bị xóa sổ khỏi bản đồ thế giới.");
@@ -348,7 +349,13 @@ const App: React.FC = () => {
                         <div className="lg:col-span-2 flex flex-col gap-6">
                             <div className="bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
                                 <NationalEmblem nationName={stats.nationName} imageUrl={stats.emblemImageUrl} isLoading={isLoading && !stats.emblemImageUrl} />
-                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 -mt-2">TRẠNG THÁI QUỐC GIA</h2>
+                                {stats.allianceName && (
+                                    <div className="text-center -mt-2 mb-2">
+                                        <p className="text-sm text-gray-400">Thành viên của</p>
+                                        <p className="font-bold text-lg text-purple-400 tracking-wide">{stats.allianceName}</p>
+                                    </div>
+                                )}
+                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2">TRẠNG THÁI QUỐC GIA</h2>
                                 <div className="space-y-3">
                                     <StatDisplay icon="economy" label="Kinh tế" value={formatNumber(stats.economy)} unit="Tỷ USD" />
                                     <StatDisplay icon="manpower" label="Nhân lực" value={formatNumber(stats.manpower)} />

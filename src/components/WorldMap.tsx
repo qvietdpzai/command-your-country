@@ -3,6 +3,7 @@ import { WorldMap as WorldMapData, RegionID, FactionID } from '../types';
 
 const FACTION_COLORS: Record<FactionID, string> = {
     player: 'fill-blue-500/80 stroke-blue-300',
+    player_alliance: 'fill-purple-500/80 stroke-purple-300',
     eastern_alliance: 'fill-red-500/80 stroke-red-300',
     western_alliance: 'fill-green-500/80 stroke-green-300',
     neutral: 'fill-gray-600/70 stroke-gray-400',
@@ -10,6 +11,7 @@ const FACTION_COLORS: Record<FactionID, string> = {
 
 const FACTION_NAMES: Record<FactionID, string> = {
     player: 'Quốc gia của bạn',
+    player_alliance: 'Liên minh của bạn',
     eastern_alliance: 'Liên minh Phương Đông',
     western_alliance: 'Liên minh Phương Tây',
     neutral: 'Trung lập'
@@ -83,8 +85,9 @@ export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
             </div>
             <div className="w-full mt-2 px-2">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">CHÚ GIẢI BẢN ĐỒ</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1">
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                     <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
+                    <LegendItem colorClass={FACTION_COLORS.player_alliance} name={FACTION_NAMES.player_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.western_alliance} name={FACTION_NAMES.western_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.eastern_alliance} name={FACTION_NAMES.eastern_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.neutral} name={FACTION_NAMES.neutral} />

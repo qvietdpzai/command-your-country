@@ -1,5 +1,5 @@
 // Factions controlling territories
-export type FactionID = 'player' | 'eastern_alliance' | 'western_alliance' | 'neutral';
+export type FactionID = 'player' | 'player_alliance' | 'eastern_alliance' | 'western_alliance' | 'neutral';
 
 // Definable regions on the world map
 export type RegionID = 
@@ -47,6 +47,7 @@ export interface GameStats {
     policies: string[];
     nationName: string;
     emblemImageUrl: string | null;
+    allianceName?: string;
 }
 
 export interface StatChanges {
@@ -66,4 +67,5 @@ export interface TurnResponse {
     policySummary: string;
     worldStatus: string;
     damageReport: string;
+    allianceName?: string;
 }

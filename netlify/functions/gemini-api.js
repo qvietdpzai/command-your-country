@@ -7,10 +7,17 @@ const systemInstruction = `Bạn là một AI quản trò cho một trò chơi c
 
 HỆ THỐNG BẢN ĐỒ VÀ LÃNH THỔ:
 -   Trò chơi diễn ra trên một bản đồ thế giới được chia thành các khu vực chiến lược.
--   Mỗi khu vực được kiểm soát bởi một phe: 'player' (người chơi), 'eastern_alliance' (Liên minh Phương Đông), 'western_alliance' (Liên minh Phương Tây), hoặc 'neutral' (trung lập).
+-   Mỗi khu vực được kiểm soát bởi một phe: 'player' (người chơi), 'player_alliance' (liên minh của người chơi), 'eastern_alliance' (Liên minh Phương Đông), 'western_alliance' (Liên minh Phương Tây), hoặc 'neutral' (trung lập).
 -   Sự hiện diện quân sự của người chơi ('hasPlayerMilitary') được đánh dấu trên một khu vực. Quân đội của người chơi chỉ có thể ở một khu vực tại một thời điểm. Di chuyển quân đội có nghĩa là đặt 'hasPlayerMilitary' thành true ở khu vực mới và false ở khu vực cũ.
 -   Các thay đổi trên bản đồ (chiếm lãnh thổ, di chuyển quân) phải được trả về trong 'mapChanges'.
 -   Các hành động và sự kiện phải có logic về mặt địa lý. Ví dụ: tấn công 'western_europe' từ 'east_asia' là không hợp lý nếu không có lực lượng hải quân hoặc căn cứ ở gần đó.
+
+HỆ THỐNG LIÊN MINH:
+-   Người chơi bắt đầu với phe 'player'. Họ có thể tạo liên minh của riêng mình bằng các lệnh như "thành lập liên minh [Tên Liên minh]".
+-   Khi một liên minh được tạo, hãy trả về tên liên minh trong trường 'allianceName'. Đồng thời, sử dụng 'mapChanges' để thay đổi tất cả các vùng lãnh thổ 'player' thành 'player_alliance'.
+-   Người chơi có thể mời các quốc gia 'neutral' vào liên minh của họ. Sự thành công phụ thuộc vào chỉ số Ngoại giao.
+-   Khi một quốc gia trung lập chấp nhận lời mời, hãy sử dụng 'mapChanges' để thay đổi phe của vùng lãnh thổ đó thành 'player_alliance'.
+-   Các phe NPC (Liên minh Phương Đông, Liên minh Phương Tây) cũng có thể thuyết phục các quốc gia trung lập tham gia cùng họ. Hãy mô tả những sự kiện này trong 'worldStatus' và cập nhật bản đồ tương ứng.
 
 HỆ THỐNG CHỈ SỐ CHI TIẾT:
 -   Kinh tế (economy): GDP của quốc gia, tính bằng Tỷ USD. Thay đổi phải hợp lý (ví dụ: -50, +20).
@@ -89,7 +96,11 @@ const responseSchema = {
         damageReport: {
             type: 'STRING',
             description: "Mô tả ngắn gọn về thiệt hại mà quốc gia của bạn phải gánh chịu. PHẢI tuân thủ QUY TẮC CỐT LÕI VỀ TẤN CÔNG."
-        }
+        },
+        allianceName: { 
+            type: 'STRING', 
+            description: "Tên liên minh của người chơi, nếu nó được tạo hoặc thay đổi trong lượt này. Nếu không, hãy bỏ qua." 
+        },
     },
     required: ['outcome', 'scenario', 'statChanges', 'policySummary', 'worldStatus', 'damageReport']
 };
@@ -99,6 +110,8 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         ${systemInstruction}
 
         Trạng thái hiện tại:
+        - Quốc gia: ${currentStats.nationName}
+        - Liên minh: ${currentStats.allianceName || 'Chưa có'}
         - Kinh tế: ${currentStats.economy} Tỷ USD
         - Nhân lực: ${currentStats.manpower}
         - Quân sự: 
