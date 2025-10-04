@@ -26,7 +26,8 @@ const INITIAL_STATS: GameStats = {
     economy: 2000, // Billions USD
     manpower: 10000000,
     morale: 70, 
-    diplomacy: 60, 
+    diplomacy: 60,
+    economicGrowth: 0.5, // Starting growth rate
     worldMap: createInitialMap(), 
     policies: [], 
     nationName: '', 
@@ -74,7 +75,7 @@ const formatNumber = (num: number): string => {
 
 // --- New Components for Detailed Stats ---
 
-const StatDisplay: React.FC<{ icon: 'economy' | 'manpower'; label: string; value: string | number; unit?: string }> = ({ icon, label, value, unit }) => (
+const StatDisplay: React.FC<{ icon: 'economy' | 'manpower' | 'growth'; label: string; value: string | number; unit?: string }> = ({ icon, label, value, unit }) => (
     <div className="flex items-center justify-between text-white bg-gray-900/50 p-2 rounded-md">
         <div className="flex items-center gap-2">
             <Icon name={icon} className="w-5 h-5 text-gray-400" />
@@ -233,8 +234,12 @@ const App: React.FC = () => {
         setPlayerInput('');
 
         const changes = nextTurnData.statChanges;
+
+        // Apply economic growth before applying turn changes
+        const incomeFromGrowth = Math.floor(stats.economy * (stats.economicGrowth / 100));
+
         const totalMilitaryChange = Object.values(changes.military).reduce((a, b) => a + (b || 0), 0);
-        const totalChangeValue = totalMilitaryChange + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
+        const totalChangeValue = totalMilitaryChange + incomeFromGrowth + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
         if (totalChangeValue > 0) setTimeout(() => playSoundWithInit('stat_increase'), 200);
         else if (totalChangeValue < 0) setTimeout(() => playSoundWithInit('stat_decrease'), 200);
 
@@ -263,10 +268,11 @@ const App: React.FC = () => {
         const newStats: GameStats = {
             ...stats,
             military: newMilitary,
-            economy: Math.max(0, stats.economy + changes.economy),
+            economy: Math.max(0, stats.economy + incomeFromGrowth + changes.economy),
             manpower: Math.max(0, stats.manpower + changes.manpower),
             morale: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.morale + changes.morale)),
             diplomacy: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.diplomacy + changes.diplomacy)),
+            economicGrowth: stats.economicGrowth + changes.economicGrowth,
             worldMap: newWorldMap,
             policies: [nextTurnData.policySummary, ...stats.policies],
         };
@@ -346,6 +352,7 @@ const App: React.FC = () => {
                                 <div className="space-y-3">
                                     <StatDisplay icon="economy" label="Kinh tế" value={formatNumber(stats.economy)} unit="Tỷ USD" />
                                     <StatDisplay icon="manpower" label="Nhân lực" value={formatNumber(stats.manpower)} />
+                                    <StatDisplay icon="growth" label="Tăng trưởng KT" value={stats.economicGrowth.toFixed(2)} unit="%" />
                                     <div className="pt-2">
                                         <h3 className="text-sm font-bold text-gray-400 mb-2 text-center">LỰC LƯỢNG VŨ TRANG</h3>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

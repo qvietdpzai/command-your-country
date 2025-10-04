@@ -21,6 +21,7 @@ HỆ THỐNG CHỈ SỐ CHI TIẾT:
     -   Hải quân (navy): Tàu chiến.
     -   Không quân (airforce): Máy bay chiến đấu.
 -   Tinh thần (morale) & Ngoại giao (diplomacy): Thang điểm 0-100.
+-   Tăng trưởng Kinh tế (economicGrowth): Tỷ lệ phần trăm. Mỗi lượt, nền kinh tế sẽ tự động tăng theo tỷ lệ này. Bạn có thể điều chỉnh tỷ lệ này.
 
 QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
 1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC chỉ có thể xảy ra nếu có lý do chính đáng.
@@ -60,6 +61,7 @@ const responseSchema = {
                 manpower: { type: 'INTEGER', description: 'Thay đổi chỉ số nhân lực.' },
                 morale: { type: 'INTEGER', description: 'Thay đổi chỉ số tinh thần (thang 0-100).' },
                 diplomacy: { type: 'INTEGER', description: 'Thay đổi chỉ số ngoại giao (thang 0-100).' },
+                economicGrowth: { type: 'NUMBER', description: 'Thay đổi tỷ lệ tăng trưởng kinh tế (%). Ví dụ: 0.1, -0.2.' },
                 mapChanges: {
                     type: 'ARRAY',
                     description: "Danh sách các thay đổi trên bản đồ thế giới. Chỉ bao gồm các khu vực bị ảnh hưởng.",
@@ -74,7 +76,7 @@ const responseSchema = {
                     }
                 }
             },
-            required: ['military', 'economy', 'manpower', 'morale', 'diplomacy', 'mapChanges']
+            required: ['military', 'economy', 'manpower', 'morale', 'diplomacy', 'economicGrowth', 'mapChanges']
         },
         policySummary: {
             type: 'STRING',
@@ -106,6 +108,7 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
           - Không quân: ${currentStats.military.airforce}
         - Tinh thần: ${currentStats.morale}/100
         - Ngoại giao: ${currentStats.diplomacy}/100
+        - Tăng trưởng Kinh tế: ${currentStats.economicGrowth}%
         - Bản đồ thế giới (JSON): ${JSON.stringify(currentStats.worldMap)}
 
         Hành động cuối cùng của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}

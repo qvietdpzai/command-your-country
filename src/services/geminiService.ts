@@ -42,6 +42,7 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
                 manpower: 0,
                 morale: 0, 
                 diplomacy: 0, 
+                economicGrowth: 0,
                 mapChanges: []
             },
             policySummary: "Lỗi Hệ thống",

@@ -42,6 +42,7 @@ export interface GameStats {
     manpower: number; // Total available personnel
     morale: number; // 0-100 scale
     diplomacy: number; // 0-100 scale
+    economicGrowth: number; // Percentage
     worldMap: WorldMap; // Replaces territoryControl
     policies: string[];
     nationName: string;
@@ -54,6 +55,7 @@ export interface StatChanges {
     manpower: number;
     morale: number;
     diplomacy: number;
+    economicGrowth: number;
     mapChanges: MapChange[]; // Replaces territoryControlChange
 }
 
