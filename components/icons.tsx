@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning';
+    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce';
 }
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
@@ -36,6 +36,50 @@ export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
                     <path d="M9.5 6H20a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-1.5"/>
                     <path d="M16 11.5a2.5 2.5 0 0 0-5 0V18"/>
                     <path d="M8 11.5a2.5 2.5 0 0 1 5 0V18"/>
+                </svg>
+            );
+        case 'manpower': // Users icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+            );
+        case 'infantry': // Person Standing icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <circle cx="12" cy="5" r="1"/>
+                    <path d="m9 20 3-6 3 6"/>
+                    <path d="m6 8 6 2 6-2"/>
+                    <path d="M12 10v4"/>
+                </svg>
+            );
+        case 'armor': // Tank icon (simplified)
+            return (
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M2 9.5V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.5"/>
+                    <path d="M22 14v-1.5"/>
+                    <path d="M2 14v-1.5"/>
+                    <path d="M4 14h16"/>
+                    <path d="M6 14v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2"/>
+                    <path d="M12 6V3.5a1.5 1.5 0 0 1 3 0V6"/>
+                </svg>
+            );
+        case 'navy': // Ship icon
+            return (
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.5 0 2.5 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9-.5 2.5-1"/>
+                    <path d="M19.38 14.71a1 1 0 0 0 .52-1.6L16 9l-4 4-1.4-1.4"/>
+                    <path d="M12 13 2 6l10 1-1 4.5Z"/>
+                    <path d="m22 6-10-1"/>
+                </svg>
+            );
+        case 'airforce': // Plane icon
+             return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
                 </svg>
             );
         case 'play':

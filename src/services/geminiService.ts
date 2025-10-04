@@ -29,14 +29,20 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     } catch (error) {
         console.error("Error fetching next turn from API function:", error);
         
-        // Improved error handling to show specific server messages on the frontend
         const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
         const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
 
         return {
             outcome,
             scenario,
-            statChanges: { military: 0, economy: 0, morale: 0, diplomacy: 0, territoryControlChange: 0 },
+            statChanges: { 
+                military: {}, 
+                economy: 0, 
+                manpower: 0,
+                morale: 0, 
+                diplomacy: 0, 
+                territoryControlChange: 0 
+            },
             policySummary: "Lỗi Hệ thống",
             worldStatus: "Thông tin tình báo bị gián đoạn do lỗi kết nối.",
             damageReport: "Báo cáo thiệt hại không có sẵn do lỗi kết nối."

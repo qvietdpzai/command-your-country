@@ -1,24 +1,30 @@
 const { GoogleGenAI } = require("@google/genai");
 
-// The API key is read from Netlify's environment variables
-// This makes the function resilient to case-sensitivity issues in env var naming (API_KEY vs API_key)
 const apiKey = process.env.API_KEY || process.env.API_key;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.
 
+HỆ THỐNG CHỈ SỐ CHI TIẾT:
+-   Kinh tế (economy): GDP của quốc gia, tính bằng Tỷ USD. Thay đổi phải hợp lý (ví dụ: -50, +20).
+-   Nhân lực (manpower): Dân số sẵn sàng cho quân đội và công nghiệp.
+-   Quân sự (military): Được chia thành 4 loại đơn vị:
+    -   Bộ binh (infantry): Lực lượng trên bộ.
+    -   Thiết giáp (armor): Xe tăng và xe bọc thép.
+    -   Hải quân (navy): Tàu chiến.
+    -   Không quân (airforce): Máy bay chiến đấu.
+-   Tinh thần (morale) & Ngoại giao (diplomacy): Thang điểm 0-100.
+
 QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
-1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC (dẫn đến thiệt hại trong damageReport) chỉ có thể xảy ra nếu có lý do chính đáng.
-2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn gần đây của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp, khiến họ bị cô lập và trở thành mục tiêu. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế nghiêm trọng. (D) Căng thẳng thế giới leo thang đến mức xung đột cục bộ là không thể tránh khỏi.
-3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:' và PHẢI nêu rõ lý do của cuộc tấn công. Ví dụ: 'Báo động đỏ: Do chính sách ngoại giao hiếu chiến của bạn, Liên minh Phương Bắc đã tiến hành một cuộc tấn công chớp nhoáng...' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
+1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC (dẫn đến thiệt hại quân sự hoặc kinh tế) chỉ có thể xảy ra nếu có lý do chính đáng.
+2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn gần đây của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế nghiêm trọng. (D) Căng thẳng thế giới leo thang.
+3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:' và PHẢI nêu rõ lý do. Ví dụ: 'Báo động đỏ: Do các cuộc tập trận khiêu khích của bạn, Liên minh Phương Đông đã tiến hành không kích, phá hủy 25 máy bay và 50 xe tăng.' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
 
 CÁC QUY TẮC KHÁC:
--   Phân tích hành động của người chơi và tạo ra các kết quả và kịch bản mới đẩy căng thẳng leo thang một cách logic.
--   Các quốc gia láng giềng luôn hung hăng và tìm cách mở rộng lãnh thổ, nhưng hành động của chúng phải có lý do.
--   Tình hình thế giới (worldStatus) phải phản ánh sự gia tăng căng thẳng toàn cầu.
--   Hành động của người chơi ảnh hưởng đến tất cả các chỉ số, bao gồm Quân sự, Kinh tế, Tinh thần, Nhân lực và Ngoại giao.
--   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.
--   Không tạo ra các lựa chọn cho người chơi, chỉ cung cấp kịch bản.`;
+-   **THẾ GIỚI SỐNG ĐỘNG:** Thế giới không chỉ xoay quanh người chơi. Các quốc gia và liên minh NPC khác có thể và NÊN tương tác với nhau, bao gồm cả việc gây chiến với nhau nếu có lý do địa chính trị hợp lệ. Hãy báo cáo những sự kiện quan trọng này trong 'worldStatus' để người chơi biết.
+-   Tạo ra các kết quả và kịch bản đẩy căng thẳng leo thang một cách logic.
+-   Thiệt hại và tăng trưởng phải được phản ánh bằng những con số cụ thể trong statChanges. Ví dụ, xây dựng nhà máy có thể tăng 'economy', tuyển quân tăng 'infantry' nhưng giảm 'manpower' và 'economy'.
+-   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.`;
 
 const responseSchema = {
     type: 'OBJECT',
@@ -34,44 +40,35 @@ const responseSchema = {
         statChanges: {
             type: 'OBJECT',
             properties: {
-                military: { 
-                    type: 'INTEGER', 
-                    description: 'Thay đổi chỉ số quân sự (ví dụ: -10, 5, 0).'
+                military: {
+                    type: 'OBJECT',
+                    description: 'Thay đổi số lượng các đơn vị quân sự. Chỉ bao gồm các đơn vị bị ảnh hưởng.',
+                    properties: {
+                        infantry: { type: 'INTEGER', description: 'Thay đổi số lượng bộ binh.' },
+                        armor: { type: 'INTEGER', description: 'Thay đổi số lượng thiết giáp.' },
+                        navy: { type: 'INTEGER', description: 'Thay đổi số lượng tàu hải quân.' },
+                        airforce: { type: 'INTEGER', description: 'Thay đổi số lượng máy bay.' },
+                    }
                 },
-                economy: { 
-                    type: 'INTEGER', 
-                    description: 'Thay đổi chỉ số kinh tế.'
-                },
-                morale: { 
-                    type: 'INTEGER', 
-                    description: 'Thay đổi chỉ số tinh thần.'
-                },
-                diplomacy: {
-                    type: 'INTEGER',
-                    description: 'Thay đổi chỉ số ngoại giao.'
-                },
-                manpower: {
-                    type: 'INTEGER',
-                    description: 'Thay đổi chỉ số nhân lực.'
-                },
-                territoryControlChange: {
-                    type: 'INTEGER',
-                    description: 'Thay đổi chỉ số kiểm soát lãnh thổ.'
-                }
+                economy: { type: 'INTEGER', description: 'Thay đổi chỉ số kinh tế (tính bằng Tỷ USD).' },
+                manpower: { type: 'INTEGER', description: 'Thay đổi chỉ số nhân lực.' },
+                morale: { type: 'INTEGER', description: 'Thay đổi chỉ số tinh thần (thang 0-100).' },
+                diplomacy: { type: 'INTEGER', description: 'Thay đổi chỉ số ngoại giao (thang 0-100).' },
+                territoryControlChange: { type: 'INTEGER', description: 'Thay đổi chỉ số kiểm soát lãnh thổ (%).' }
             },
-            required: ['military', 'economy', 'morale', 'diplomacy', 'manpower', 'territoryControlChange']
+            required: ['military', 'economy', 'manpower', 'morale', 'diplomacy', 'territoryControlChange']
         },
         policySummary: {
             type: 'STRING',
-            description: 'Tóm tắt hành động của người chơi thành một chính sách hoặc học thuyết ngắn gọn (ví dụ: "Chính sách Củng cố Biên giới", "Học thuyết Ưu tiên Kinh tế"). Nếu là lượt đầu tiên, trả về "Khởi đầu Kỷ nguyên Mới".'
+            description: 'Tóm tắt hành động của người chơi thành một chính sách hoặc học thuyết ngắn gọn. Nếu là lượt đầu tiên, trả về "Khởi đầu Kỷ nguyên Mới".'
         },
         worldStatus: {
             type: 'STRING',
-            description: 'Một hoặc hai câu mô tả tình hình địa chính trị toàn cầu hiện tại. Ví dụ: "Các quốc gia láng giềng đang tăng cường phòng thủ. Căng thẳng gia tăng tại các tuyến đường thương mại hàng hải."'
+            description: 'Một hoặc hai câu mô tả tình hình địa chính trị toàn cầu hiện tại, bao gồm cả các sự kiện quan trọng giữa các NPC.'
         },
         damageReport: {
             type: 'STRING',
-            description: "Mô tả ngắn gọn về thiệt hại (quân sự, kinh tế, dân sự) mà quốc gia của bạn phải gánh chịu trong lượt này. PHẢI tuân thủ QUY TẮC CỐT LÕI VỀ TẤN CÔNG."
+            description: "Mô tả ngắn gọn về thiệt hại mà quốc gia của bạn phải gánh chịu. PHẢI tuân thủ QUY TẮC CỐT LÕI VỀ TẤN CÔNG."
         }
     },
     required: ['outcome', 'scenario', 'statChanges', 'policySummary', 'worldStatus', 'damageReport']
@@ -82,16 +79,20 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         ${systemInstruction}
 
         Trạng thái hiện tại:
-        - Quân sự: ${currentStats.military}
-        - Kinh tế: ${currentStats.economy}
-        - Tinh thần: ${currentStats.morale}
-        - Ngoại giao: ${currentStats.diplomacy}
-        - Nhân lực: ${currentStats.manpower || 500000}
+        - Kinh tế: ${currentStats.economy} Tỷ USD
+        - Nhân lực: ${currentStats.manpower}
+        - Quân sự: 
+          - Bộ binh: ${currentStats.military.infantry}
+          - Thiết giáp: ${currentStats.military.armor}
+          - Hải quân: ${currentStats.military.navy}
+          - Không quân: ${currentStats.military.airforce}
+        - Tinh thần: ${currentStats.morale}/100
+        - Ngoại giao: ${currentStats.diplomacy}/100
         - Kiểm soát Lãnh thổ: ${currentStats.territoryControl}%
 
         Hành động cuối cùng của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}
 
-        Dựa trên trạng thái và hành động trên, hãy tạo ra kết quả, kịch bản mới, thay đổi chỉ số, chính sách tóm tắt, báo cáo thiệt hại và tình hình thế giới mới.
+        Dựa trên trạng thái và hành động trên, hãy tạo ra phản hồi JSON theo schema đã cho.
     `;
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -99,7 +100,7 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         config: {
             responseMimeType: "application/json",
             responseSchema,
-            temperature: 0.9,
+            temperature: 0.8,
         }
     });
     
@@ -127,14 +128,10 @@ const handleGenerateNationalEmblem = async (nationName) => {
 };
 
 exports.handler = async function(event, context) {
-    // Crucial check: ensure API key is configured before proceeding.
     if (!ai) {
         const errorMessage = "Server configuration error: The API key is missing or invalid. Please check the API_KEY environment variable in Netlify settings.";
         console.error(errorMessage);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: errorMessage }),
-        };
+        return { statusCode: 500, body: JSON.stringify({ message: errorMessage }) };
     }
 
     if (event.httpMethod !== 'POST') {
