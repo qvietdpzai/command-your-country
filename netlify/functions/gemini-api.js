@@ -128,18 +128,40 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
 
         Dựa trên trạng thái và hành động trên, hãy tạo ra phản hồi JSON theo schema đã cho.
     `;
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema,
-            temperature: 0.8,
-        }
-    });
     
-    const jsonText = response.text.trim();
-    return JSON.parse(jsonText);
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema,
+                temperature: 0.8,
+                thinkingConfig: { thinkingBudget: 0 },
+            }
+        });
+
+        if (!response || !response.text) {
+            console.error("Gemini API returned an empty response.", { response });
+            throw new Error("AI model failed to generate a response.");
+        }
+        
+        const jsonText = response.text.trim();
+        // The model can sometimes return markdown ```json ... ```
+        const cleanedJsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+
+        try {
+            return JSON.parse(cleanedJsonText);
+        } catch (parseError) {
+            console.error("Failed to parse JSON from Gemini API response:", parseError);
+            console.error("Invalid JSON received:", cleanedJsonText);
+            throw new Error("AI model returned an invalid data format.");
+        }
+
+    } catch (apiError) {
+        console.error("Error calling Gemini API in handleGetNextTurn:", apiError);
+        throw new Error(apiError.message || "An unexpected error occurred with the AI model.");
+    }
 };
 
 const handleGenerateNationalEmblem = async (nationName) => {

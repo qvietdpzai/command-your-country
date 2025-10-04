@@ -17,7 +17,8 @@ const callApi = async (action: string, payload: any) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         console.error(`API Error (${action}):`, errorData);
-        throw new Error(errorData.message || 'Failed to fetch from API');
+        const errorMessage = errorData.details ? `${errorData.message} (${errorData.details})` : errorData.message || 'Failed to fetch from API';
+        throw new Error(errorMessage);
     }
 
     return response.json();
@@ -30,8 +31,10 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     } catch (error) {
         console.error("Error fetching next turn from API function:", error);
         
-        const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
-        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
+        const errorMessage = error instanceof Error ? error.message : "Lỗi kết nối máy chủ không xác định";
+        const outcome = `Lỗi: ${errorMessage}`;
+        const scenario = `Không thể kết nối đến máy chủ điều khiển trò chơi. Đã xảy ra lỗi khi xử lý mệnh lệnh của bạn. Vui lòng thử lại. (Chi tiết: ${errorMessage})`;
+
 
         return {
             outcome,
