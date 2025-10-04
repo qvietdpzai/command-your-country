@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-    name: 'military' | 'economy' | 'morale' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning';
+    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning';
 }
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
@@ -27,6 +27,15 @@ export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     <path d="m9 12 2 2 4-4"/>
+                </svg>
+            );
+        case 'diplomacy': // Handshake icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M14.5 18H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.5"/>
+                    <path d="M9.5 6H20a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-1.5"/>
+                    <path d="M16 11.5a2.5 2.5 0 0 0-5 0V18"/>
+                    <path d="M8 11.5a2.5 2.5 0 0 1 5 0V18"/>
                 </svg>
             );
         case 'play':

@@ -6,7 +6,7 @@ import { TerritoryMap } from './components/TerritoryMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { soundService, SoundName } from './services/soundService';
 
-const INITIAL_STATS: GameStats = { military: 70, economy: 70, morale: 70, territoryControl: 50, policies: [], nationName: '', emblemImageUrl: null };
+const INITIAL_STATS: GameStats = { military: 70, economy: 70, morale: 70, diplomacy: 60, territoryControl: 50, policies: [], nationName: '', emblemImageUrl: null };
 const MAX_STATS = 100;
 const SAVE_GAME_KEY = 'ww3-savegame';
 
@@ -50,7 +50,7 @@ const useTypingEffect = (text: string = '', speed: number = 25): string => {
 };
 
 
-const StatBar: React.FC<{ value: number; icon: 'military' | 'economy' | 'morale'; label: string }> = ({ value, icon, label }) => {
+const StatBar: React.FC<{ value: number; icon: 'military' | 'economy' | 'morale' | 'diplomacy'; label: string }> = ({ value, icon, label }) => {
     const percentage = (value / MAX_STATS) * 100;
     const barColor = value > 60 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500';
 
@@ -206,10 +206,10 @@ const App: React.FC = () => {
         playSoundWithInit('receive_response');
         setPlayerInput('');
 
-        const { military, economy, morale, territoryControlChange } = nextTurnData.statChanges;
-        if (military > 0 || economy > 0 || morale > 0 || territoryControlChange > 0) {
+        const { military, economy, morale, diplomacy, territoryControlChange } = nextTurnData.statChanges;
+        if (military > 0 || economy > 0 || morale > 0 || diplomacy > 0 || territoryControlChange > 0) {
             setTimeout(() => playSoundWithInit('stat_increase'), 200);
-        } else if (military < 0 || economy < 0 || morale < 0 || territoryControlChange < 0) {
+        } else if (military < 0 || economy < 0 || morale < 0 || diplomacy < 0 || territoryControlChange < 0) {
             setTimeout(() => playSoundWithInit('stat_decrease'), 200);
         }
 
@@ -218,6 +218,7 @@ const App: React.FC = () => {
             military: Math.max(0, Math.min(MAX_STATS, stats.military + military)),
             economy: Math.max(0, Math.min(MAX_STATS, stats.economy + economy)),
             morale: Math.max(0, Math.min(MAX_STATS, stats.morale + morale)),
+            diplomacy: Math.max(0, Math.min(MAX_STATS, stats.diplomacy + diplomacy)),
             territoryControl: Math.max(0, Math.min(MAX_STATS, stats.territoryControl + territoryControlChange)),
             policies: [nextTurnData.policySummary, ...stats.policies],
         };
@@ -331,6 +332,7 @@ const App: React.FC = () => {
                                 <StatBar value={stats.military} icon="military" label="Quân sự" />
                                 <StatBar value={stats.economy} icon="economy" label="Kinh tế" />
                                 <StatBar value={stats.morale} icon="morale" label="Tinh thần" />
+                                <StatBar value={stats.diplomacy} icon="diplomacy" label="Ngoại giao" />
                                 <TerritoryMap percentage={stats.territoryControl} />
                             </div>
                             <div className="bg-black/30 p-4 rounded-lg border border-gray-700">

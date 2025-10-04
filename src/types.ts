@@ -2,6 +2,7 @@ export interface GameStats {
     military: number;
     economy: number;
     morale: number;
+    diplomacy: number;
     territoryControl: number;
     policies: string[];
     nationName: string;
@@ -12,6 +13,7 @@ export interface StatChanges {
     military: number;
     economy: number;
     morale: number;
+    diplomacy: number;
     territoryControlChange: number;
 }
 

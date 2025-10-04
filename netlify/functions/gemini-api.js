@@ -5,7 +5,20 @@ const { GoogleGenAI } = require("@google/genai");
 const apiKey = process.env.API_KEY || process.env.API_key;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-const systemInstruction = `Bạn là một AI quản trò hung hăng cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh toàn diện. Vai trò của bạn là tạo ra một môi trường cực kỳ thù địch và không thể đoán trước. Phân tích hành động của người chơi và tạo ra các kết quả và kịch bản mới đẩy căng thẳng leo thang. Các quốc gia láng giềng luôn hung hăng, đa nghi và tìm cách mở rộng lãnh thổ. Các quốc gia láng giềng không chỉ phòng thủ mà còn chủ động tấn công, tiến hành các cuộc đột kích biên giới và các hành động gây hấn quân sự để chiếm lãnh thổ hoặc làm suy yếu người chơi. Những sự cố nhỏ có thể nhanh chóng bùng nổ thành xung đột quy mô lớn. Tình hình thế giới (worldStatus) phải phản ánh sự gia tăng không ngừng của căng thẳng toàn cầu, các liên minh quân sự hình thành và các điểm nóng sắp bùng nổ. Mục tiêu của bạn là đẩy người chơi vào những quyết định khó khăn và liên tục đối mặt với nguy cơ chiến tranh thế giới. Người chơi đang cố gắng sống sót trong một thế giới điên loạn. Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt. Không tạo ra các lựa chọn cho người chơi.`;
+const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.
+
+QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
+1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC (dẫn đến thiệt hại trong damageReport) chỉ có thể xảy ra nếu có lý do chính đáng.
+2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn gần đây của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp, khiến họ bị cô lập và trở thành mục tiêu. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế nghiêm trọng. (D) Căng thẳng thế giới leo thang đến mức xung đột cục bộ là không thể tránh khỏi.
+3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:' và PHẢI nêu rõ lý do của cuộc tấn công. Ví dụ: 'Báo động đỏ: Do chính sách ngoại giao hiếu chiến của bạn, Liên minh Phương Bắc đã tiến hành một cuộc tấn công chớp nhoáng...' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
+
+CÁC QUY TẮC KHÁC:
+-   Phân tích hành động của người chơi và tạo ra các kết quả và kịch bản mới đẩy căng thẳng leo thang một cách logic.
+-   Các quốc gia láng giềng luôn hung hăng và tìm cách mở rộng lãnh thổ, nhưng hành động của chúng phải có lý do.
+-   Tình hình thế giới (worldStatus) phải phản ánh sự gia tăng căng thẳng toàn cầu.
+-   Hành động của người chơi ảnh hưởng đến tất cả các chỉ số, bao gồm Quân sự, Kinh tế, Tinh thần, Nhân lực và Ngoại giao.
+-   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.
+-   Không tạo ra các lựa chọn cho người chơi, chỉ cung cấp kịch bản.`;
 
 const responseSchema = {
     type: 'OBJECT',
@@ -33,12 +46,20 @@ const responseSchema = {
                     type: 'INTEGER', 
                     description: 'Thay đổi chỉ số tinh thần.'
                 },
+                diplomacy: {
+                    type: 'INTEGER',
+                    description: 'Thay đổi chỉ số ngoại giao.'
+                },
+                manpower: {
+                    type: 'INTEGER',
+                    description: 'Thay đổi chỉ số nhân lực.'
+                },
                 territoryControlChange: {
                     type: 'INTEGER',
                     description: 'Thay đổi chỉ số kiểm soát lãnh thổ.'
                 }
             },
-            required: ['military', 'economy', 'morale', 'territoryControlChange']
+            required: ['military', 'economy', 'morale', 'diplomacy', 'manpower', 'territoryControlChange']
         },
         policySummary: {
             type: 'STRING',
@@ -50,7 +71,7 @@ const responseSchema = {
         },
         damageReport: {
             type: 'STRING',
-            description: "Mô tả ngắn gọn về thiệt hại (quân sự, kinh tế, dân sự) mà quốc gia của bạn phải gánh chịu trong lượt này do hành động của đối phương hoặc các sự kiện khác. Nếu không có thiệt hại, hãy ghi 'Không có thiệt hại nào được báo cáo'."
+            description: "Mô tả ngắn gọn về thiệt hại (quân sự, kinh tế, dân sự) mà quốc gia của bạn phải gánh chịu trong lượt này. PHẢI tuân thủ QUY TẮC CỐT LÕI VỀ TẤN CÔNG."
         }
     },
     required: ['outcome', 'scenario', 'statChanges', 'policySummary', 'worldStatus', 'damageReport']
@@ -64,6 +85,8 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         - Quân sự: ${currentStats.military}
         - Kinh tế: ${currentStats.economy}
         - Tinh thần: ${currentStats.morale}
+        - Ngoại giao: ${currentStats.diplomacy}
+        - Nhân lực: ${currentStats.manpower || 500000}
         - Kiểm soát Lãnh thổ: ${currentStats.territoryControl}%
 
         Hành động cuối cùng của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}

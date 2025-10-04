@@ -36,7 +36,7 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
         return {
             outcome,
             scenario,
-            statChanges: { military: 0, economy: 0, morale: 0, territoryControlChange: 0 },
+            statChanges: { military: 0, economy: 0, morale: 0, diplomacy: 0, territoryControlChange: 0 },
             policySummary: "Lỗi Hệ thống",
             worldStatus: "Thông tin tình báo bị gián đoạn do lỗi kết nối.",
             damageReport: "Báo cáo thiệt hại không có sẵn do lỗi kết nối."
