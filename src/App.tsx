@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getNextTurn, generateNationalEmblem } from './services/geminiService';
-import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID, FactionID } from './types';
+import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID } from './types';
 import { Icon } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
@@ -143,9 +143,9 @@ const App: React.FC = () => {
         soundService.playSound(sound);
     };
 
-    const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse, currentEventLog: string[]) => {
+    const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse | null, currentEventLog: string[]) => {
         if (!currentTurnData) return;
-        const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog };
+        const gameData: SavedGameData = { stats: currentStats, turnData: turnData, eventLog: currentEventLog };
         localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
         setHasSaveGame(true);
     };
