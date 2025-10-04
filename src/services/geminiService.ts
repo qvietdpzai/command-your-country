@@ -1,4 +1,5 @@
 import { GameStats, TurnResponse } from '../types';
+import { generateEmblemSVG } from './emblemService';
 
 // The endpoint for our Netlify function
 const API_ENDPOINT = '/.netlify/functions/gemini-api';
@@ -50,13 +51,17 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     }
 };
 
-export const generateNationalEmblem = async (nationName: string): Promise<string | null> => {
+export const generateNationalEmblem = async (nationName: string): Promise<string> => {
     try {
         const payload = { nationName };
         const result = await callApi('generateNationalEmblem', payload);
-        return result.imageUrl;
+        if (result && result.imageUrl) {
+            return result.imageUrl;
+        }
+        console.warn("API did not return an image, generating SVG fallback.");
+        return generateEmblemSVG(nationName);
     } catch (error) {
-        console.error("Error generating national emblem from API function:", error);
-        return null;
+        console.error("Error generating national emblem via API, generating SVG fallback:", error);
+        return generateEmblemSVG(nationName);
     }
 };

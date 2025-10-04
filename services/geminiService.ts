@@ -1,4 +1,5 @@
 import { GameStats, TurnResponse } from '../types';
+import { generateEmblemSVG } from './emblemService';
 
 // The endpoint for our Netlify function
 const API_ENDPOINT = '/.netlify/functions/gemini-api';
@@ -15,7 +16,7 @@ const callApi = async (action: string, payload: any) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        console.error(`API Error (${action}):`, errorData.message);
+        console.error(`API Error (${action}):`, errorData);
         throw new Error(errorData.message || 'Failed to fetch from API');
     }
 
@@ -29,8 +30,8 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     } catch (error) {
         console.error("Error fetching next turn from API function:", error);
         
-        const outcome = "Lỗi kết nối máy chủ";
-        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng và thử lại.";
+        const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
+        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
 
         return {
             outcome,
@@ -50,13 +51,17 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     }
 };
 
-export const generateNationalEmblem = async (nationName: string): Promise<string | null> => {
+export const generateNationalEmblem = async (nationName: string): Promise<string> => {
     try {
         const payload = { nationName };
         const result = await callApi('generateNationalEmblem', payload);
-        return result.imageUrl;
+        if (result && result.imageUrl) {
+            return result.imageUrl;
+        }
+        console.warn("API did not return an image, generating SVG fallback.");
+        return generateEmblemSVG(nationName);
     } catch (error) {
-        console.error("Error generating national emblem from API function:", error);
-        return null;
+        console.error("Error generating national emblem via API, generating SVG fallback:", error);
+        return generateEmblemSVG(nationName);
     }
 };

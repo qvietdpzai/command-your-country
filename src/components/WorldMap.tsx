@@ -9,7 +9,7 @@ const FACTION_COLORS: Record<FactionID, string> = {
 };
 
 const FACTION_NAMES: Record<FactionID, string> = {
-    player: 'Bạn',
+    player: 'Quốc gia của bạn',
     eastern_alliance: 'Liên minh Phương Đông',
     western_alliance: 'Liên minh Phương Tây',
     neutral: 'Trung lập'
@@ -81,11 +81,14 @@ export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
                     )}
                 </svg>
             </div>
-            <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1 mt-2 px-2">
-                <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
-                <LegendItem colorClass={FACTION_COLORS.western_alliance} name={FACTION_NAMES.western_alliance} />
-                <LegendItem colorClass={FACTION_COLORS.eastern_alliance} name={FACTION_NAMES.eastern_alliance} />
-                <LegendItem colorClass={FACTION_COLORS.neutral} name={FACTION_NAMES.neutral} />
+            <div className="w-full mt-2 px-2">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">CHÚ GIẢI BẢN ĐỒ</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1">
+                    <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
+                    <LegendItem colorClass={FACTION_COLORS.western_alliance} name={FACTION_NAMES.western_alliance} />
+                    <LegendItem colorClass={FACTION_COLORS.eastern_alliance} name={FACTION_NAMES.eastern_alliance} />
+                    <LegendItem colorClass={FACTION_COLORS.neutral} name={FACTION_NAMES.neutral} />
+                </div>
             </div>
         </div>
     );
