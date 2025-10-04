@@ -15,7 +15,7 @@ const callApi = async (action: string, payload: any) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-        console.error(`API Error (${action}):`, errorData.message);
+        console.error(`API Error (${action}):`, errorData);
         throw new Error(errorData.message || 'Failed to fetch from API');
     }
 
@@ -29,9 +29,9 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     } catch (error) {
         console.error("Error fetching next turn from API function:", error);
         
-        // Generic error handling for the frontend
-        const outcome = "Lỗi kết nối máy chủ";
-        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng và thử lại.";
+        // Improved error handling to show specific server messages on the frontend
+        const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
+        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
 
         return {
             outcome,

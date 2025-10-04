@@ -1,8 +1,9 @@
 const { GoogleGenAI } = require("@google/genai");
 
-// The API key is read from Netlify's environment variables (process.env.API_KEY)
-// This keeps the key secure on the server-side.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// The API key is read from Netlify's environment variables
+// This makes the function resilient to case-sensitivity issues in env var naming (API_KEY vs API_key)
+const apiKey = process.env.API_KEY || process.env.API_key;
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const systemInstruction = `Bạn là một AI quản trò hung hăng cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh toàn diện. Vai trò của bạn là tạo ra một môi trường cực kỳ thù địch và không thể đoán trước. Phân tích hành động của người chơi và tạo ra các kết quả và kịch bản mới đẩy căng thẳng leo thang. Các quốc gia láng giềng luôn hung hăng, đa nghi và tìm cách mở rộng lãnh thổ. Các quốc gia láng giềng không chỉ phòng thủ mà còn chủ động tấn công, tiến hành các cuộc đột kích biên giới và các hành động gây hấn quân sự để chiếm lãnh thổ hoặc làm suy yếu người chơi. Những sự cố nhỏ có thể nhanh chóng bùng nổ thành xung đột quy mô lớn. Tình hình thế giới (worldStatus) phải phản ánh sự gia tăng không ngừng của căng thẳng toàn cầu, các liên minh quân sự hình thành và các điểm nóng sắp bùng nổ. Mục tiêu của bạn là đẩy người chơi vào những quyết định khó khăn và liên tục đối mặt với nguy cơ chiến tranh thế giới. Người chơi đang cố gắng sống sót trong một thế giới điên loạn. Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt. Không tạo ra các lựa chọn cho người chơi.`;
 
@@ -103,6 +104,16 @@ const handleGenerateNationalEmblem = async (nationName) => {
 };
 
 exports.handler = async function(event, context) {
+    // Crucial check: ensure API key is configured before proceeding.
+    if (!ai) {
+        const errorMessage = "Server configuration error: The API key is missing or invalid. Please check the API_KEY environment variable in Netlify settings.";
+        console.error(errorMessage);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ message: errorMessage }),
+        };
+    }
+
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
