@@ -12,6 +12,44 @@ const SAVE_GAME_KEY = 'ww3-savegame';
 
 type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
+// Custom hook for the typing animation effect
+const useTypingEffect = (text: string = '', speed: number = 25): string => {
+    const [displayedText, setDisplayedText] = useState('');
+
+    useEffect(() => {
+        // Audio is initialized on user interaction elsewhere, but this is a fallback.
+        soundService.init();
+    }, []);
+    
+    useEffect(() => {
+        if (!text) {
+            setDisplayedText('');
+            return;
+        }
+
+        let i = 0;
+        setDisplayedText('');
+        
+        const intervalId = setInterval(() => {
+            if (i < text.length) {
+                setDisplayedText(prev => prev + text.charAt(i));
+                // Play sound less frequently to avoid being annoying
+                if (i % 3 === 0) {
+                    soundService.playSound('text_typing');
+                }
+                i++;
+            } else {
+                clearInterval(intervalId);
+            }
+        }, speed);
+
+        return () => clearInterval(intervalId);
+    }, [text, speed]);
+
+    return displayedText;
+};
+
+
 const StatBar: React.FC<{ value: number; icon: 'military' | 'economy' | 'morale'; label: string }> = ({ value, icon, label }) => {
     const percentage = (value / MAX_STATS) * 100;
     const barColor = value > 60 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500';
@@ -47,6 +85,8 @@ const App: React.FC = () => {
     const [tempNationName, setTempNationName] = useState('');
     const [hasSaveGame, setHasSaveGame] = useState(false);
     const audioInitialized = useRef(false);
+    const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
+
 
     useEffect(() => {
         const savedGame = localStorage.getItem(SAVE_GAME_KEY);
@@ -208,9 +248,9 @@ const App: React.FC = () => {
             case 'menu':
                 return (
                     <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                        <h1 className="text-5xl font-bold bg-gradient-to-r from-red-500 to-yellow-400 text-transparent bg-clip-text mb-4">WW3: Xung đột toàn cầu</h1>
-                        <p className="text-gray-400 mb-8 max-w-sm">Bạn là nhà lãnh đạo tối cao. Mỗi quyết định đều có thể dẫn đến chiến thắng hoặc thất bại.</p>
-                        <div className="flex flex-col sm:flex-row gap-4">
+                        <h1 className="text-5xl font-bold bg-gradient-to-r from-red-500 to-yellow-400 text-transparent bg-clip-text mb-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>WW3: Xung đột toàn cầu</h1>
+                        <p className="text-gray-400 mb-8 max-w-sm animate-fade-in" style={{ animationDelay: '0.3s' }}>Bạn là nhà lãnh đạo tối cao. Mỗi quyết định đều có thể dẫn đến chiến thắng hoặc thất bại.</p>
+                        <div className="flex flex-col sm:flex-row gap-4 animate-fade-in" style={{ animationDelay: '0.5s' }}>
                             {hasSaveGame && (
                                 <button
                                     onClick={loadGame}
@@ -237,9 +277,9 @@ const App: React.FC = () => {
             case 'naming':
                 return (
                     <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                        <h2 className="text-3xl font-bold text-gray-200 mb-4">Đặt tên cho quốc gia của bạn</h2>
-                        <p className="text-gray-400 mb-8 max-w-md">Tên quốc gia sẽ định hình vận mệnh và biểu tượng của dân tộc bạn.</p>
-                        <form onSubmit={(e) => { e.preventDefault(); handleNationCreation(); }} className="w-full max-w-sm flex flex-col gap-4">
+                        <h2 className="text-3xl font-bold text-gray-200 mb-4 animate-slide-in-up" style={{ animationDelay: '0.1s' }}>Đặt tên cho quốc gia của bạn</h2>
+                        <p className="text-gray-400 mb-8 max-w-md animate-slide-in-up" style={{ animationDelay: '0.3s' }}>Tên quốc gia sẽ định hình vận mệnh và biểu tượng của dân tộc bạn.</p>
+                        <form onSubmit={(e) => { e.preventDefault(); handleNationCreation(); }} className="w-full max-w-sm flex flex-col gap-4 animate-slide-in-up" style={{ animationDelay: '0.5s' }}>
                             <input
                                 type="text"
                                 value={tempNationName}
@@ -263,11 +303,11 @@ const App: React.FC = () => {
             case 'gameOver':
                 return (
                     <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                        <h2 className="text-3xl font-bold text-red-500 mb-4">TRÒ CHƠI KẾT THÚC</h2>
-                        <p className="text-gray-300 mb-8 max-w-md">{gameOverMessage}</p>
+                        <h2 className="text-3xl font-bold text-red-500 mb-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>TRÒ CHƠI KẾT THÚC</h2>
+                        <p className="text-gray-300 mb-8 max-w-md animate-fade-in" style={{ animationDelay: '0.3s' }}>{gameOverMessage}</p>
                         <button
                             onClick={resetGame}
-                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105"
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 animate-fade-in" style={{ animationDelay: '0.5s' }}
                         >
                             <Icon name="refresh" className="w-5 h-5"/>
                             Chơi lại
@@ -276,8 +316,9 @@ const App: React.FC = () => {
                 );
             
             case 'playing':
+                const isTyping = animatedScenario.length < (turnData?.scenario || '').length;
                 return (
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in">
                         {/* Left Panels */}
                         <div className="lg:col-span-2 flex flex-col gap-6">
                             <div className="bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
@@ -323,29 +364,32 @@ const App: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="flex-grow flex flex-col">
-                                    <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4">
+                                    <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4 animate-slide-in-up" style={{ animationDelay: '0.1s' }}>
                                         <h3 className="font-bold text-yellow-400 text-sm mb-1 flex items-center gap-2"><Icon name="warning" className="w-4 h-4" />BÁO CÁO THIỆT HẠI</h3>
                                         <p className="text-gray-300 text-sm">{turnData?.damageReport}</p>
                                     </div>
-                                    <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-4">
+                                    <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-4 animate-slide-in-up" style={{ animationDelay: '0.2s' }}>
                                         <h3 className="font-bold text-gray-400 text-sm mb-1">TÌNH BÁO TOÀN CẦU</h3>
                                         <p className="text-gray-300 text-sm">{turnData?.worldStatus}</p>
                                     </div>
-                                    <p className="text-green-300 mb-4 text-lg flex-grow">{turnData?.scenario}</p>
-                                    <form onSubmit={handleFormSubmit} className="mt-auto">
+                                    <p className="text-green-300 mb-4 text-lg flex-grow min-h-[4.5rem] animate-slide-in-up" style={{ animationDelay: '0.3s' }}>
+                                        {animatedScenario}
+                                        {isTyping && <span className="typing-cursor">_</span>}
+                                    </p>
+                                    <form onSubmit={handleFormSubmit} className="mt-auto animate-fade-in" style={{ animationDelay: '0.4s' }}>
                                         <label htmlFor="player-action" className="sr-only">Hành động của bạn</label>
-                                        <div className="flex items-center gap-2 bg-black/50 border border-gray-600 rounded-lg p-2 focus-within:ring-2 focus-within:ring-green-500">
+                                        <div className="flex items-center gap-2 bg-black/50 border rounded-lg p-2 form-input-glow">
                                             <span className="font-mono text-cyan-400 pl-2">{'>'}</span>
-                                            <textarea
+                                            <input
                                                 id="player-action"
+                                                type="text"
                                                 value={playerInput}
                                                 onChange={(e) => setPlayerInput(e.target.value)}
                                                 onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAction(); }
+                                                    if (e.key === 'Enter') { e.preventDefault(); handleAction(); }
                                                 }}
                                                 placeholder="Nhập mệnh lệnh của bạn ở đây..."
-                                                className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500 resize-none"
-                                                rows={2}
+                                                className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500"
                                                 disabled={isLoading}
                                                 autoFocus
                                             />
@@ -368,11 +412,11 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 selection:bg-green-500 selection:text-black">
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 selection:bg-green-500 selection:text-black relative overflow-hidden scanline-overlay">
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-gray-900 via-gray-900 to-black z-0 opacity-80"></div>
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/black-felt.png')] opacity-10 z-0"></div>
             
-            <main className="w-full max-w-6xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700">
+            <main className="w-full max-w-6xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700 glow-border">
                 {renderContent()}
             </main>
 

@@ -6,7 +6,8 @@ export type SoundName =
     | 'receive_response'
     | 'stat_increase'
     | 'stat_decrease'
-    | 'game_over';
+    | 'game_over'
+    | 'text_typing';
 
 // Store audio data as base64 to keep it self-contained
 // Corrected base64 strings to prevent 'atob' encoding errors.
@@ -17,7 +18,8 @@ const sounds: Record<SoundName, string> = {
     receive_response: 'data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhVwAAAP9/AIAAAQGCAAEBBwD/f/5//f/6//f/8//r/+f/5//n/+f/6P/q/+r/7P/u/+7/7//w//H/9P/1/Pb/9v/3//j/+f/7//z//P/9//4//v/+AAAAAA==',
     stat_increase: 'data:audio/wav;base64,UklGRlAAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhUAAAAH6Ag4SKhYOEg4B+fHx6eXh2dnRzcXBvbm1sbWpqaWhnZ2ZlZmRjZGFgX15dW1tZWFhXVlVUVFNSUU9OTUxLSklIR0ZFRENCQUA/Pjw7Ojk4NzY1NDMyMTAwLy4tLCsmJSQlIiEgICAfHh0cHBsaGRgXFhUUExMRCw==',
     stat_decrease: 'data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhWAAAAAsPERMWFxsZGhscHR4gISIjJCUmKCkqKywtLzEyMzQ1Njc5Ojs8PT5AQUJERUZISUpMTU5QUVJTVFVWV1hZWltcXV5gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXt8fX5/gYKEhYaHiImKi4yNjo+QkZKTlJWWl5iamps=',
-    game_over: 'data:audio/wav;base64,UklGRlYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhTAAAAMrKzM7P0NLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA='
+    game_over: 'data:audio/wav;base64,UklGRlYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhTAAAAMrKzM7P0NLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=',
+    text_typing: 'data:audio/wav;base64,UklGRkYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhBgAAAP8/vw=='
 };
 
 let audioContext: AudioContext | null = null;
