@@ -94,8 +94,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
 
                         const faction = regionState.controlledBy;
                         const isSelected = selectedRegion === regionId;
-                        const factionColor = FACTION_COLORS[faction].split(' ')[0]; // e.g., 'fill-blue-500/80'
-
+                        
                         const title = `${region.name} - ${FACTION_NAMES[faction]}\nCông sự: ${regionState.fortificationLevel}/5${regionState.strategicResource ? `\nTài nguyên: ${regionState.strategicResource}` : ''}${regionState.isContested ? '\nTình trạng: Đang tranh chấp' : ''}`;
 
                         return (
