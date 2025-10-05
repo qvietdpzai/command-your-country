@@ -1,5 +1,5 @@
 import React from 'react';
-import { WorldMap as WorldMapData, RegionID, FactionID } from '../types';
+import { WorldMap as WorldMapData, RegionID, FactionID, MilitaryStats } from '../types';
 
 const FACTION_COLORS: Record<FactionID, string> = {
     player: 'fill-blue-500/80 stroke-blue-300',
@@ -43,16 +43,25 @@ interface WorldMapProps {
     mapData: WorldMapData;
     onRegionSelect: (regionId: RegionID) => void;
     selectedRegion: RegionID | null;
+    playerMilitaryStats: MilitaryStats;
 }
 
-export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, selectedRegion }) => {
+const formatTotalStrength = (military: Partial<MilitaryStats> | undefined): string => {
+    if (!military) return '';
+    const total = (military.infantry || 0) + (military.armor || 0) + (military.navy || 0) + (military.airforce || 0);
+    if (total <= 0) return '';
+    if (total < 1000) return total.toString();
+    return `${Math.floor(total / 1000)}k`;
+};
+
+export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, selectedRegion, playerMilitaryStats }) => {
     const playerMilitaryRegion = Object.keys(mapData).find(key => mapData[key as RegionID].hasPlayerMilitary) as RegionID | undefined;
 
     return (
         <div className="mt-4 flex flex-col items-center">
             <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢC TOÀN CẦU</h3>
             <div className="bg-gray-900/50 p-2 rounded-md w-full">
-                <svg viewBox="0 0 560 210" className="w-full h-auto">
+                <svg viewBox="0 0 560 210" className="w-full h-auto" style={{ fontSize: '10px' }}>
                     <defs>
                         <filter id="glow">
                             <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
@@ -62,6 +71,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
                             </feMerge>
                         </filter>
                     </defs>
+                    {/* Region Paths */}
                     {Object.keys(REGION_DATA).map(key => {
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
@@ -78,14 +88,57 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
                             </g>
                         );
                     })}
+
+                    {/* NPC Military Presence */}
+                    {Object.keys(mapData).map(key => {
+                        const regionId = key as RegionID;
+                        const regionState = mapData[regionId];
+                        const regionDisplayData = REGION_DATA[regionId];
+                        const isPlayerControlled = regionState.controlledBy === 'player' || regionState.controlledBy === 'player_alliance';
+                        
+                        if (!isPlayerControlled && regionState.militaryPresence) {
+                            const totalStrength = formatTotalStrength(regionState.militaryPresence);
+                            if (totalStrength) {
+                                return (
+                                    <text
+                                        key={`${regionId}-strength`}
+                                        x={regionDisplayData.center[0]}
+                                        y={regionDisplayData.center[1] + 4}
+                                        textAnchor="middle"
+                                        className="fill-white font-bold pointer-events-none"
+                                        stroke="black"
+                                        strokeWidth="0.4"
+                                    >
+                                        {totalStrength}
+                                    </text>
+                                );
+                            }
+                        }
+                        return null;
+                    })}
+                    
+                    {/* Player Military Presence (Star + Count) */}
                     {playerMilitaryRegion && (
                         <g transform={`translate(${REGION_DATA[playerMilitaryRegion].center[0]}, ${REGION_DATA[playerMilitaryRegion].center[1]})`} className="pointer-events-none">
-                             <path d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z" 
-                                className="fill-yellow-300 stroke-black" 
-                                strokeWidth="0.5"
-                                style={{ filter: 'url(#glow)' }}
-                            />
-                             <title>Sự hiện diện quân sự của bạn</title>
+                            <g transform="translate(-8, 0)">
+                                <path 
+                                    d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z"
+                                    className="fill-yellow-300 stroke-black" 
+                                    strokeWidth="0.5"
+                                    style={{ filter: 'url(#glow)' }}
+                                />
+                            </g>
+                            <text
+                                x="4"
+                                y="4"
+                                textAnchor="start"
+                                className="fill-yellow-300 font-bold"
+                                stroke="black"
+                                strokeWidth="0.4"
+                            >
+                                {formatTotalStrength(playerMilitaryStats)}
+                            </text>
+                            <title>Sự hiện diện quân sự của bạn: {formatTotalStrength(playerMilitaryStats).replace('k', ',000')}</title>
                         </g>
                     )}
                 </svg>

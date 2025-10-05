@@ -409,7 +409,12 @@ const App: React.FC = () => {
                                     <MoraleDiplomacyBar value={stats.morale} icon="morale" label="Tinh thần" />
                                     <MoraleDiplomacyBar value={stats.diplomacy} icon="diplomacy" label="Ngoại giao" />
                                 </div>
-                                <WorldMapComponent mapData={stats.worldMap} onRegionSelect={setSelectedRegion} selectedRegion={selectedRegion} />
+                                <WorldMapComponent 
+                                    mapData={stats.worldMap} 
+                                    onRegionSelect={setSelectedRegion} 
+                                    selectedRegion={selectedRegion}
+                                    playerMilitaryStats={stats.military}
+                                />
                             </div>
                             {selectedRegion && (
                                 <RegionDetail 
