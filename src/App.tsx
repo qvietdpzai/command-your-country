@@ -9,6 +9,11 @@ import { RegionDetail } from './components/RegionDetail';
 
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
 
+// Check for SpeechRecognition API
+// Fix: Cast window to `any` to access non-standard SpeechRecognition properties.
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+const hasSpeechRecognition = !!SpeechRecognition;
+
 const createInitialMap = (): WorldMap => {
     const map: Partial<WorldMap> = {};
     REGIONS.forEach(region => {
@@ -35,17 +40,12 @@ const INITIAL_STATS: GameStats = {
     emblemImageUrl: null 
 };
 const MAX_MORALE_DIPLOMACY = 100;
-const SAVE_GAME_KEY = 'ww3-savegame-v3'; // New key for map structure
+const SAVE_GAME_KEY = 'ww3-savegame-v3';
 
 type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
-// Custom hook for the typing animation effect
 const useTypingEffect = (text: string = '', speed: number = 25): string => {
     const [displayedText, setDisplayedText] = useState('');
-
-    useEffect(() => {
-        // Init is now handled by user interaction in the main component
-    }, []);
     
     useEffect(() => {
         if (!text) {
@@ -69,12 +69,7 @@ const useTypingEffect = (text: string = '', speed: number = 25): string => {
     return displayedText;
 };
 
-// Helper to format large numbers
-const formatNumber = (num: number): string => {
-    return new Intl.NumberFormat('en-US').format(num);
-};
-
-// --- New Components for Detailed Stats ---
+const formatNumber = (num: number): string => new Intl.NumberFormat('en-US').format(num);
 
 const StatDisplay: React.FC<{ icon: 'economy' | 'manpower' | 'growth'; label: string; value: string | number; unit?: string }> = ({ icon, label, value, unit }) => (
     <div className="flex items-center justify-between text-white bg-gray-900/50 p-2 rounded-md">
@@ -107,8 +102,6 @@ const MoraleDiplomacyBar: React.FC<{ value: number; icon: 'morale' | 'diplomacy'
     );
 };
 
-// --- Main App Component ---
-
 interface SavedGameData {
     stats: GameStats;
     turnData: TurnResponse;
@@ -127,13 +120,58 @@ const App: React.FC = () => {
     const [hasSaveGame, setHasSaveGame] = useState(false);
     const [isMusicOn, setIsMusicOn] = useState(false);
     const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
+    const [isListening, setIsListening] = useState(false);
+    // Fix: Use `any` for the ref type as `SpeechRecognition` is a variable, not a type, and the type is not globally defined.
+    const recognitionRef = useRef<any | null>(null);
     const audioInitialized = useRef(false);
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
 
     useEffect(() => {
         const savedGame = localStorage.getItem(SAVE_GAME_KEY);
         setHasSaveGame(!!savedGame);
+
+        if (hasSpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'vi-VN';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setPlayerInput(transcript);
+                setIsListening(false);
+            };
+
+            recognition.onerror = (event: any) => {
+                console.error('Speech recognition error:', event.error);
+                setIsListening(false);
+            };
+
+            recognition.onend = () => {
+                setIsListening(false);
+            };
+            
+            recognitionRef.current = recognition;
+        }
+
+        return () => {
+            recognitionRef.current?.abort();
+        };
     }, []);
+
+    const toggleListening = () => {
+        if (isLoading || !hasSpeechRecognition) return;
+        
+        initializeAudio();
+
+        if (isListening) {
+            recognitionRef.current?.stop();
+        } else {
+            recognitionRef.current?.start();
+        }
+        setIsListening(!isListening);
+    };
 
     const initializeAudio = useCallback(() => {
         if (!audioInitialized.current) {
@@ -176,14 +214,12 @@ const App: React.FC = () => {
         if (savedGameString) {
             try {
                 const savedGame: SavedGameData = JSON.parse(savedGameString);
-                // Basic validation for new map structure
                 if (savedGame.stats.worldMap && savedGame.stats.worldMap.north_america) {
                     setStats(savedGame.stats);
                     setTurnData(savedGame.turnData);
                     setEventLog(savedGame.eventLog);
                     setGameState('playing');
                 } else {
-                    // Old save data, start new game
                     clearSaveGame();
                     setGameState('naming');
                 }
@@ -213,16 +249,11 @@ const App: React.FC = () => {
             getNextTurn(currentStats, null)
         ]);
 
-        // First turn response should include initial NPC military presence
         const newWorldMap = { ...currentStats.worldMap };
         initialTurn.statChanges.mapChanges.forEach(change => {
             if (newWorldMap[change.region]) {
-                if (change.militaryPresence) {
-                    newWorldMap[change.region].militaryPresence = change.militaryPresence;
-                }
-                 if (change.newController) {
-                    newWorldMap[change.region].controlledBy = change.newController;
-                }
+                if (change.militaryPresence) newWorldMap[change.region].militaryPresence = change.militaryPresence;
+                if (change.newController) newWorldMap[change.region].controlledBy = change.newController;
             }
         });
     
@@ -274,10 +305,7 @@ const App: React.FC = () => {
         setPlayerInput('');
 
         const changes = nextTurnData.statChanges;
-
-        // Apply economic growth before applying turn changes
         const incomeFromGrowth = Math.floor(stats.economy * (stats.economicGrowth / 100));
-
         const totalMilitaryChange = Object.values(changes.military).reduce((a, b) => a + (b || 0), 0);
         const totalChangeValue = totalMilitaryChange + incomeFromGrowth + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
         if (totalChangeValue > 0) setTimeout(() => playSoundWithInit('stat_increase'), 200);
@@ -292,19 +320,16 @@ const App: React.FC = () => {
         const newWorldMap = { ...stats.worldMap };
         changes.mapChanges.forEach(change => {
             if (newWorldMap[change.region]) {
-                if (change.newController) {
-                    newWorldMap[change.region].controlledBy = change.newController;
+                if (change.newController) newWorldMap[change.region].controlledBy = change.newController;
+                if (typeof change.playerMilitary === 'boolean') {
+                    if (change.playerMilitary === true) {
+                        REGIONS.forEach(r => newWorldMap[r].hasPlayerMilitary = false);
+                        newWorldMap[change.region].hasPlayerMilitary = true;
+                    } else {
+                         newWorldMap[change.region].hasPlayerMilitary = false;
+                    }
                 }
-                if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === true) {
-                    // Move military presence to the new region
-                    REGIONS.forEach(r => newWorldMap[r].hasPlayerMilitary = false);
-                    newWorldMap[change.region].hasPlayerMilitary = true;
-                } else if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === false) {
-                     newWorldMap[change.region].hasPlayerMilitary = false;
-                }
-                if (change.militaryPresence) {
-                    newWorldMap[change.region].militaryPresence = change.militaryPresence;
-                }
+                if (change.militaryPresence) newWorldMap[change.region].militaryPresence = change.militaryPresence;
             }
         });
 
@@ -416,7 +441,7 @@ const App: React.FC = () => {
                                     playerMilitaryStats={stats.military}
                                 />
                             </div>
-                            {selectedRegion && (
+                            {selectedRegion && !isLoading && (
                                 <RegionDetail 
                                     selectedRegion={selectedRegion} 
                                     mapData={stats.worldMap} 
@@ -465,10 +490,16 @@ const App: React.FC = () => {
                                     </p>
                                     <form onSubmit={handleFormSubmit} className="mt-auto animate-fade-in" style={{ animationDelay: '0.3s' }}>
                                         <label htmlFor="player-action" className="sr-only">Hành động của bạn</label>
-                                        <div className="flex items-center gap-2 bg-black/50 border rounded-lg p-2 form-input-glow">
+                                        <div className="flex items-center gap-2 bg-black/50 border rounded-lg p-2 form-input-glow relative">
                                             <span className="font-mono text-cyan-400 pl-2">{'>'}</span>
-                                            <input id="player-action" type="text" value={playerInput} onChange={(e) => setPlayerInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAction(); } }} placeholder="Nhập mệnh lệnh của bạn ở đây..." className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500" disabled={isLoading} autoFocus />
-                                            <button type="submit" disabled={isLoading || !playerInput.trim()} className="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed self-end" aria-label="Gửi mệnh lệnh">
+                                            {isListening && <span className="text-sm text-red-400 animate-pulse absolute left-10 -top-6">Đang nghe...</span>}
+                                            <input id="player-action" type="text" value={playerInput} onChange={(e) => setPlayerInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAction(); } }} placeholder="Nhập mệnh lệnh của bạn ở đây..." className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500 pr-10" disabled={isLoading} autoFocus />
+                                            {hasSpeechRecognition && (
+                                                <button type="button" onClick={toggleListening} disabled={isLoading} className={`p-2 rounded-md transition-colors disabled:opacity-50 ${isListening ? 'text-red-500' : 'text-gray-400 hover:text-white'}`} aria-label="Bắt đầu ghi âm mệnh lệnh">
+                                                    <Icon name="microphone" className="w-5 h-5"/>
+                                                </button>
+                                            )}
+                                            <button type="submit" disabled={isLoading || !playerInput.trim()} className="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Gửi mệnh lệnh">
                                                 <Icon name="send" className="w-5 h-5"/>
                                             </button>
                                         </div>
