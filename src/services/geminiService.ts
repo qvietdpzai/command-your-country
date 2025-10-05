@@ -31,10 +31,15 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     } catch (error) {
         console.error("Error fetching next turn from API function:", error);
         
-        const errorMessage = error instanceof Error ? error.message : "Lỗi kết nối máy chủ không xác định";
-        const outcome = `Lỗi: ${errorMessage}`;
-        const scenario = `Không thể kết nối đến máy chủ điều khiển trò chơi. Đã xảy ra lỗi khi xử lý mệnh lệnh của bạn. Vui lòng thử lại. (Chi tiết: ${errorMessage})`;
+        let errorMessage = error instanceof Error ? error.message : "Lỗi kết nối máy chủ không xác định";
+        let outcome = `Lỗi: ${errorMessage}`;
+        let scenario = `Không thể kết nối đến máy chủ điều khiển trò chơi. Đã xảy ra lỗi khi xử lý mệnh lệnh của bạn. Vui lòng thử lại. (Chi tiết: ${errorMessage})`;
 
+        // Check for specific quota/rate limit error from Gemini API
+        if (errorMessage.includes('429') && (errorMessage.includes('quota') || errorMessage.includes('RESOURCE_EXHAUSTED'))) {
+             outcome = "Lỗi: Đã đạt đến giới hạn yêu cầu API";
+             scenario = "Bạn đã vượt quá hạn ngạch yêu cầu API miễn phí cho ngày hôm nay. Máy chủ chỉ huy tạm thời không thể xử lý mệnh lệnh mới. Vui lòng thử lại sau khi hạn ngạch của bạn được làm mới (thường là sau 24 giờ).";
+        }
 
         return {
             outcome,
