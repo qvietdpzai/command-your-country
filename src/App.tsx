@@ -5,19 +5,20 @@ import { Icon } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { soundService, SoundName } from './services/soundService';
+import { RegionDetail } from './components/RegionDetail';
 
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
 
 const createInitialMap = (): WorldMap => {
     const map: Partial<WorldMap> = {};
     REGIONS.forEach(region => {
-        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false };
+        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false, militaryPresence: {} };
     });
     // Assign starting territories
-    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true };
-    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false };
-    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false };
-    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false };
+    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true, militaryPresence: {} };
+    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false, militaryPresence: {} };
+    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {} };
+    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {} };
     return map as WorldMap;
 };
 
@@ -43,7 +44,7 @@ const useTypingEffect = (text: string = '', speed: number = 25): string => {
     const [displayedText, setDisplayedText] = useState('');
 
     useEffect(() => {
-        soundService.init();
+        // Init is now handled by user interaction in the main component
     }, []);
     
     useEffect(() => {
@@ -125,6 +126,7 @@ const App: React.FC = () => {
     const [tempNationName, setTempNationName] = useState('');
     const [hasSaveGame, setHasSaveGame] = useState(false);
     const [isMusicOn, setIsMusicOn] = useState(false);
+    const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
     const audioInitialized = useRef(false);
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
 
@@ -140,10 +142,10 @@ const App: React.FC = () => {
         }
     }, []);
 
-    const playSoundWithInit = (sound: SoundName) => {
+    const playSoundWithInit = useCallback((sound: SoundName) => {
         initializeAudio();
         soundService.playSound(sound);
-    };
+    }, [initializeAudio]);
 
     const toggleMusic = () => {
         initializeAudio();
@@ -201,6 +203,7 @@ const App: React.FC = () => {
         setGameState('playing');
         setEventLog([]);
         setPlayerInput('');
+        setSelectedRegion(null);
     
         let currentStats: GameStats = { ...INITIAL_STATS, nationName: tempNationName, emblemImageUrl: null };
         setStats(currentStats);
@@ -209,8 +212,28 @@ const App: React.FC = () => {
             generateNationalEmblem(tempNationName),
             getNextTurn(currentStats, null)
         ]);
+
+        // First turn response should include initial NPC military presence
+        const newWorldMap = { ...currentStats.worldMap };
+        initialTurn.statChanges.mapChanges.forEach(change => {
+            if (newWorldMap[change.region]) {
+                if (change.militaryPresence) {
+                    newWorldMap[change.region].militaryPresence = change.militaryPresence;
+                }
+            }
+        });
     
-        currentStats = { ...currentStats, emblemImageUrl: emblemUrl, policies: [initialTurn.policySummary] };
+        currentStats = { 
+            ...currentStats, 
+            worldMap: newWorldMap,
+            emblemImageUrl: emblemUrl, 
+            policies: [initialTurn.policySummary] 
+        };
+        
+        if (initialTurn.allianceName) {
+            currentStats.allianceName = initialTurn.allianceName;
+        }
+
         setStats(currentStats);
         setTurnData(initialTurn);
         const newLog = [initialTurn.outcome];
@@ -229,6 +252,7 @@ const App: React.FC = () => {
         setTurnData(null);
         setEventLog([]);
         setTempNationName('');
+        setSelectedRegion(null);
     }
 
     const handleAction = useCallback(async () => {
@@ -239,6 +263,7 @@ const App: React.FC = () => {
         const actionToSubmit = playerInput;
         const newEventLog = [`> ${actionToSubmit}`, ...eventLog];
         setEventLog(newEventLog);
+        setSelectedRegion(null);
 
         const nextTurnData = await getNextTurn(stats, actionToSubmit);
         
@@ -274,6 +299,9 @@ const App: React.FC = () => {
                 } else if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === false) {
                      newWorldMap[change.region].hasPlayerMilitary = false;
                 }
+                if (change.militaryPresence) {
+                    newWorldMap[change.region].militaryPresence = change.militaryPresence;
+                }
             }
         });
 
@@ -287,6 +315,7 @@ const App: React.FC = () => {
             economicGrowth: stats.economicGrowth + changes.economicGrowth,
             worldMap: newWorldMap,
             policies: [nextTurnData.policySummary, ...stats.policies],
+            allianceName: nextTurnData.allianceName || stats.allianceName,
         };
 
         setStats(newStats);
@@ -295,8 +324,8 @@ const App: React.FC = () => {
         setEventLog(finalEventLog);
         setIsLoading(false);
 
-        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player');
-        if (!playerHasTerritory) {
+        const playerTerritories = Object.values(newStats.worldMap).filter(r => r.controlledBy === 'player' || r.controlledBy === 'player_alliance').length;
+        if (playerTerritories === 0) {
             setGameState('gameOver');
             setGameOverMessage("Bạn đã mất quyền kiểm soát tất cả các vùng lãnh thổ. Quốc gia của bạn đã bị xóa sổ khỏi bản đồ thế giới.");
             clearSaveGame();
@@ -377,8 +406,16 @@ const App: React.FC = () => {
                                     <MoraleDiplomacyBar value={stats.morale} icon="morale" label="Tinh thần" />
                                     <MoraleDiplomacyBar value={stats.diplomacy} icon="diplomacy" label="Ngoại giao" />
                                 </div>
-                                <WorldMapComponent mapData={stats.worldMap} />
+                                <WorldMapComponent mapData={stats.worldMap} onRegionSelect={setSelectedRegion} selectedRegion={selectedRegion} />
                             </div>
+                            {selectedRegion && (
+                                <RegionDetail 
+                                    selectedRegion={selectedRegion} 
+                                    mapData={stats.worldMap} 
+                                    playerStats={stats} 
+                                    onClose={() => setSelectedRegion(null)} 
+                                />
+                            )}
                             <div className="bg-black/30 p-4 rounded-lg border border-gray-700">
                                 <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-3 flex items-center justify-center gap-2"><Icon name="policy" />HỌC THUYẾT QUỐC GIA</h2>
                                 <ul className="space-y-2 text-sm text-gray-400 max-h-48 overflow-y-auto pr-2">

@@ -39,7 +39,13 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
     </div>
 );
 
-export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
+interface WorldMapProps {
+    mapData: WorldMapData;
+    onRegionSelect: (regionId: RegionID) => void;
+    selectedRegion: RegionID | null;
+}
+
+export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, selectedRegion }) => {
     const playerMilitaryRegion = Object.keys(mapData).find(key => mapData[key as RegionID].hasPlayerMilitary) as RegionID | undefined;
 
     return (
@@ -60,12 +66,13 @@ export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
                         const faction = mapData[regionId]?.controlledBy || 'neutral';
+                        const isSelected = selectedRegion === regionId;
                         return (
-                            <g key={regionId} className="group">
+                            <g key={regionId} className="group cursor-pointer" onClick={() => onRegionSelect(regionId)}>
                                 <path
                                     d={region.path}
-                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white`}
-                                    strokeWidth="1.5"
+                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white ${isSelected ? 'stroke-yellow-300' : ''}`}
+                                    strokeWidth={isSelected ? 2.5 : 1.5}
                                 />
                                 <title>{`${region.name} - Kiểm soát bởi: ${FACTION_NAMES[faction]}`}</title>
                             </g>

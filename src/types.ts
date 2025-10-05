@@ -19,6 +19,7 @@ export type RegionID =
 export interface RegionState {
     controlledBy: FactionID;
     hasPlayerMilitary: boolean;
+    militaryPresence?: Partial<MilitaryStats>; // Troops stationed in the region
 }
 
 export type WorldMap = Record<RegionID, RegionState>;
@@ -27,6 +28,7 @@ export interface MapChange {
     region: RegionID;
     newController?: FactionID;
     playerMilitary?: boolean; // true to place/move, false to remove, undefined to not change
+    militaryPresence?: Partial<MilitaryStats>; // New troop numbers in the region after events
 }
 
 export interface MilitaryStats {

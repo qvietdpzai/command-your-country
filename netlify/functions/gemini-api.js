@@ -19,16 +19,15 @@ HỆ THỐNG LIÊN MINH:
 -   Khi một quốc gia trung lập chấp nhận lời mời, hãy sử dụng 'mapChanges' để thay đổi phe của vùng lãnh thổ đó thành 'player_alliance'.
 -   Các phe NPC (Liên minh Phương Đông, Liên minh Phương Tây) cũng có thể thuyết phục các quốc gia trung lập tham gia cùng họ. Hãy mô tả những sự kiện này trong 'worldStatus' và cập nhật bản đồ tương ứng.
 
-HỆ THỐNG CHỈ SỐ CHI TIẾT:
--   Kinh tế (economy): GDP của quốc gia, tính bằng Tỷ USD. Thay đổi phải hợp lý (ví dụ: -50, +20).
--   Nhân lực (manpower): Dân số sẵn sàng cho quân đội và công nghiệp.
--   Quân sự (military): Được chia thành 4 loại đơn vị:
-    -   Bộ binh (infantry): Lực lượng trên bộ.
-    -   Thiết giáp (armor): Xe tăng và xe bọc thép.
-    -   Hải quân (navy): Tàu chiến.
-    -   Không quân (airforce): Máy bay chiến đấu.
--   Tinh thần (morale) & Ngoại giao (diplomacy): Thang điểm 0-100.
--   Tăng trưởng Kinh tế (economicGrowth): Tỷ lệ phần trăm. Mỗi lượt, nền kinh tế sẽ tự động tăng theo tỷ lệ này. Bạn có thể điều chỉnh tỷ lệ này.
+HỆ THỐNG QUÂN SỰ KHU VỰC VÀ CHIẾN ĐẤU:
+-   Mỗi khu vực do NPC kiểm soát có một lực lượng quân sự đồn trú, được thể hiện trong 'worldMap.<region>.militaryPresence'.
+-   Khi bắt đầu trò chơi, hãy phân bổ lực lượng quân sự ban đầu cho các phe NPC (Liên minh Phương Đông và Phương Tây) vào các vùng lãnh thổ của họ. Giả sử mỗi phe có tổng sức mạnh quân sự ban đầu gấp khoảng 1.5 lần người chơi.
+-   **QUYẾT ĐỊNH KẾT QUẢ CHIẾN ĐẤU:** Khi người chơi tấn công một khu vực, kết quả phải dựa trên việc so sánh lực lượng.
+    -   So sánh tổng lực lượng quân sự của người chơi (nếu 'hasPlayerMilitary' là true tại khu vực đó) với 'militaryPresence' của phe phòng thủ.
+    -   Nếu người chơi có ưu thế vượt trội, họ sẽ chiến thắng với tổn thất tối thiểu.
+    -   Nếu lực lượng cân bằng, cả hai bên sẽ chịu tổn thất nặng nề, kết quả không chắc chắn.
+    -   Nếu người chơi yếu thế hơn, họ sẽ thất bại và chịu tổn thất lớn.
+-   Sau mỗi trận chiến, hãy cập nhật 'statChanges' (tổn thất của người chơi) và 'mapChanges.militaryPresence' (tổn thất của NPC) một cách hợp lý. Nếu người chơi thắng, 'militaryPresence' của phe phòng thủ tại khu vực đó sẽ bị xóa sổ hoặc giảm mạnh, và 'newController' sẽ là 'player' hoặc 'player_alliance'.
 
 QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
 1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC chỉ có thể xảy ra nếu có lý do chính đáng.
@@ -77,7 +76,17 @@ const responseSchema = {
                         properties: {
                             region: { type: 'STRING', description: "ID của khu vực bị thay đổi (ví dụ: 'western_europe')." },
                             newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'eastern_alliance')." },
-                            playerMilitary: { type: 'BOOLEAN', description: "Sự hiện diện quân sự của người chơi (true: có, false: không)." }
+                            playerMilitary: { type: 'BOOLEAN', description: "Sự hiện diện quân sự của người chơi (true: có, false: không)." },
+                            militaryPresence: {
+                                type: 'OBJECT',
+                                description: "Số lượng quân đồn trú mới trong khu vực sau các sự kiện. Chỉ bao gồm các đơn vị bị ảnh hưởng.",
+                                properties: {
+                                    infantry: { type: 'INTEGER' },
+                                    armor: { type: 'INTEGER' },
+                                    navy: { type: 'INTEGER' },
+                                    airforce: { type: 'INTEGER' },
+                                }
+                            }
                         },
                         required: ['region']
                     }
