@@ -220,6 +220,9 @@ const App: React.FC = () => {
                 if (change.militaryPresence) {
                     newWorldMap[change.region].militaryPresence = change.militaryPresence;
                 }
+                 if (change.newController) {
+                    newWorldMap[change.region].controlledBy = change.newController;
+                }
             }
         });
     

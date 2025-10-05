@@ -75,7 +75,7 @@ const responseSchema = {
                         type: 'OBJECT',
                         properties: {
                             region: { type: 'STRING', description: "ID của khu vực bị thay đổi (ví dụ: 'western_europe')." },
-                            newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'eastern_alliance')." },
+                            newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'player_alliance', 'eastern_alliance')." },
                             playerMilitary: { type: 'BOOLEAN', description: "Sự hiện diện quân sự của người chơi (true: có, false: không)." },
                             militaryPresence: {
                                 type: 'OBJECT',
