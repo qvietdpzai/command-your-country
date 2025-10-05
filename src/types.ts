@@ -16,10 +16,15 @@ export type RegionID =
     | 'southeast_asia' 
     | 'oceania';
 
+export type StrategicResource = 'oil' | 'minerals' | 'gas';
+
 export interface RegionState {
     controlledBy: FactionID;
     hasPlayerMilitary: boolean;
     militaryPresence?: Partial<MilitaryStats>; // Troops stationed in the region
+    fortificationLevel: number; // e.g., 1-5
+    strategicResource?: StrategicResource | null;
+    isContested: boolean;
 }
 
 export type WorldMap = Record<RegionID, RegionState>;
@@ -29,6 +34,8 @@ export interface MapChange {
     newController?: FactionID;
     playerMilitary?: boolean; // true to place/move, false to remove, undefined to not change
     militaryPresence?: Partial<MilitaryStats>; // New troop numbers in the region after events
+    fortificationLevel?: number;
+    isContested?: boolean;
 }
 
 export interface MilitaryStats {

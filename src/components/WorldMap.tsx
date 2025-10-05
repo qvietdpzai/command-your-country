@@ -1,5 +1,6 @@
 import React from 'react';
-import { WorldMap as WorldMapData, RegionID, FactionID, MilitaryStats } from '../types';
+import { WorldMap as WorldMapData, RegionID, FactionID, MilitaryStats, StrategicResource } from '../types';
+import { Icon } from './icons';
 
 const FACTION_COLORS: Record<FactionID, string> = {
     player: 'fill-blue-500/80 stroke-blue-300',
@@ -16,6 +17,13 @@ const FACTION_NAMES: Record<FactionID, string> = {
     western_alliance: 'Liên minh Phương Tây',
     neutral: 'Trung lập'
 };
+
+const RESOURCE_ICONS: Record<StrategicResource, 'oil' | 'minerals' | 'gas'> = {
+    oil: 'oil',
+    minerals: 'minerals',
+    gas: 'gas'
+};
+
 
 const REGION_DATA: Record<RegionID, { path: string, center: [number, number], name: string }> = {
     north_america: { path: "M 48,93 L 48,50 L 115,10 L 175,30 L 180,95 L 125,125 Z", center: [115, 75], name: "Bắc Mỹ" },
@@ -63,6 +71,9 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
             <div className="bg-gray-900/50 p-2 rounded-md w-full">
                 <svg viewBox="0 0 560 210" className="w-full h-auto" style={{ fontSize: '10px' }}>
                     <defs>
+                        <pattern id="land-texture" patternUnits="userSpaceOnUse" width="4" height="4">
+                           <path d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2" strokeWidth="0.5" stroke="rgba(0,0,0,0.2)" />
+                        </pattern>
                         <filter id="glow">
                             <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
                             <feMerge>
@@ -71,12 +82,22 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
                             </feMerge>
                         </filter>
                     </defs>
-                    {/* Region Paths */}
+
+                    <rect x="0" y="0" width="560" height="210" fill="#1a202c" />
+
+                    {/* Region Paths and Icons */}
                     {Object.keys(REGION_DATA).map(key => {
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
-                        const faction = mapData[regionId]?.controlledBy || 'neutral';
+                        const regionState = mapData[regionId];
+                        if (!regionState) return null;
+
+                        const faction = regionState.controlledBy;
                         const isSelected = selectedRegion === regionId;
+                        const factionColor = FACTION_COLORS[faction].split(' ')[0]; // e.g., 'fill-blue-500/80'
+
+                        const title = `${region.name} - ${FACTION_NAMES[faction]}\nCông sự: ${regionState.fortificationLevel}/5${regionState.strategicResource ? `\nTài nguyên: ${regionState.strategicResource}` : ''}${regionState.isContested ? '\nTình trạng: Đang tranh chấp' : ''}`;
+
                         return (
                             <g key={regionId} className="group cursor-pointer" onClick={() => onRegionSelect(regionId)}>
                                 <path
@@ -84,7 +105,29 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
                                     className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white ${isSelected ? 'stroke-yellow-300' : ''}`}
                                     strokeWidth={isSelected ? 2.5 : 1.5}
                                 />
-                                <title>{`${region.name} - Kiểm soát bởi: ${FACTION_NAMES[faction]}`}</title>
+                                <path d={region.path} fill="url(#land-texture)" className="pointer-events-none" opacity="0.5" />
+
+                                {regionState.isContested && <path d={region.path} className="fill-none contested-zone pointer-events-none" />}
+                                <title>{title}</title>
+                                
+                                {/* Icons inside region */}
+                                <g transform={`translate(${region.center[0]}, ${region.center[1]})`} className="pointer-events-none">
+                                    {regionState.fortificationLevel > 1 && (
+                                        // FIX: Replaced `title` attribute with a `<title>` element for SVG tooltip.
+                                        <g transform="translate(-20, 8)">
+                                            <title>{`Cấp độ công sự: ${regionState.fortificationLevel}`}</title>
+                                            <Icon name="fortification" className="w-4 h-4 text-gray-200" stroke="black" strokeWidth={1}/>
+                                            <text x="5" y="4" textAnchor="middle" className="fill-white font-bold" stroke='black' strokeWidth="0.2" style={{ fontSize: '10px' }}>{regionState.fortificationLevel}</text>
+                                        </g>
+                                    )}
+                                    {regionState.strategicResource && (
+                                        // FIX: Replaced `title` attribute with a `<title>` element for SVG tooltip.
+                                        <g transform="translate(12, 8)">
+                                            <title>{`Tài nguyên: ${regionState.strategicResource}`}</title>
+                                            <Icon name={RESOURCE_ICONS[regionState.strategicResource]} className="w-4 h-4 text-yellow-300" stroke="black" strokeWidth={1} />
+                                        </g>
+                                    )}
+                                </g>
                             </g>
                         );
                     })}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RegionID, WorldMap, GameStats, FactionID } from '../types';
+import { RegionID, WorldMap, GameStats, FactionID, StrategicResource } from '../types';
 import { Icon } from './icons';
 
 const formatNumber = (num: number): string => new Intl.NumberFormat('en-US').format(num);
@@ -34,6 +34,12 @@ const REGION_NAMES: Record<RegionID, string> = {
     oceania: "Châu Đại Dương"
 };
 
+const RESOURCE_ICONS: Record<StrategicResource, 'oil' | 'minerals' | 'gas'> = {
+    oil: 'oil',
+    minerals: 'minerals',
+    gas: 'gas'
+};
+
 interface RegionDetailProps {
     selectedRegion: RegionID;
     mapData: WorldMap;
@@ -51,8 +57,6 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
     const playerForces = regionState.hasPlayerMilitary ? playerStats.military : null;
     const defenderForces = regionState.militaryPresence || {};
 
-    // FIX: Added a type check to ensure `val` is a number before comparing it.
-    // The `Object.values` method returns `unknown[]`, which caused a TypeScript error.
     const hasDefenderForces = Object.values(defenderForces).some(val => typeof val === 'number' && val > 0);
 
     return (
@@ -64,14 +68,31 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
                 </h3>
                 <button 
                     onClick={onClose} 
-                    className="text-gray-500 hover:text-white text-2xl leading-none font-bold"
+                    className="text-gray-500 hover:text-white"
                     aria-label="Đóng chi tiết khu vực"
                 >
-                    &times;
+                    <Icon name="close" className="w-5 h-5"/>
                 </button>
             </div>
             
-            <p className="text-sm text-gray-400 mb-4">Kiểm soát bởi: <span className="font-semibold text-white">{FACTION_NAMES[controllingFaction]}</span></p>
+            <p className="text-sm text-gray-400 mb-2">Kiểm soát bởi: <span className="font-semibold text-white">{FACTION_NAMES[controllingFaction]}</span></p>
+
+            <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                 <div className="flex items-center gap-2" title={`Cấp độ công sự: ${regionState.fortificationLevel}/5`}>
+                    <Icon name="fortification" className="w-5 h-5 text-gray-400" />
+                    <span className="font-semibold text-white">Công sự: {regionState.fortificationLevel} / 5</span>
+                </div>
+                {regionState.strategicResource && (
+                    <div className="flex items-center gap-2" title={`Tài nguyên chiến lược: ${regionState.strategicResource}`}>
+                        <Icon name={RESOURCE_ICONS[regionState.strategicResource]} className="w-5 h-5 text-gray-400" />
+                        <span className="font-semibold text-white capitalize">{regionState.strategicResource}</span>
+                    </div>
+                )}
+            </div>
+
+             {regionState.isContested && (
+                <p className="text-sm font-bold text-red-400 animate-pulse mb-3 text-center bg-red-900/50 py-1 rounded">VÙNG TRANH CHẤP</p>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

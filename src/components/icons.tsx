@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off' | 'microphone';
+    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off' | 'microphone' | 'fortification' | 'oil' | 'minerals' | 'gas' | 'close';
 }
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
@@ -12,6 +12,44 @@ export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                     <line x1="12" y1="19" x2="12" y2="23"></line>
+                </svg>
+            );
+        case 'fortification': // Castle tower icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M3 21h18v-8l-6-4-6 4v8z" />
+                    <path d="M3 11V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4" />
+                    <path d="M12 21V11" />
+                    <path d="M9 7V4h6v3" />
+                </svg>
+            );
+        case 'oil': // Droplet icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7z" />
+                </svg>
+            );
+        case 'minerals': // Diamond icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M2.7 10.3a2.4 2.4 0 0 0 0 3.4l7.5 7.5c.9.9 2.5.9 3.4 0l7.5-7.5a2.4 2.4 0 0 0 0-3.4l-7.5-7.5a2.4 2.4 0 0 0-3.4 0Z" />
+                    <path d="m12 22 4-4" />
+                    <path d="m10 12 2-2 2 2" />
+                    <path d="M12 2v4.5" />
+                </svg>
+            );
+        case 'gas': // Flame icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M10.5 5.5a4 4 0 1 0-5 5.5c.3-1.2.6-2.5 1-3.5.4-.8.9-1.6 1.5-2.5C8.8 3.5 9.6 2 12 2c2.4 0 3.2 1.5 4 3 .6.9 1.1 1.7 1.5 2.5.4 1 .7 2.3 1 3.5a4 4 0 1 0-5-5.5" />
+                    <path d="M12 22a2 2 0 0 1-2-2c0-1.1.9-2 2-2s2 .9 2 2a2 2 0 0 1-2 2Z" />
+                </svg>
+            );
+        case 'close':
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
             );
         case 'military': // Bomb icon

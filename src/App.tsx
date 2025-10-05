@@ -17,13 +17,14 @@ const hasSpeechRecognition = !!SpeechRecognition;
 const createInitialMap = (): WorldMap => {
     const map: Partial<WorldMap> = {};
     REGIONS.forEach(region => {
-        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false, militaryPresence: {} };
+        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 1, isContested: false, strategicResource: null };
     });
-    // Assign starting territories
-    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true, militaryPresence: {} };
-    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false, militaryPresence: {} };
-    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {} };
-    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {} };
+    // Assign starting territories and some initial flavor. The AI will override/set this on the first turn.
+    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true, militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'minerals' };
+    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'gas' };
+    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'minerals' };
+    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 1, isContested: false, strategicResource: null };
+    map['middle_east'] = { controlledBy: 'neutral', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 1, isContested: true, strategicResource: 'oil' };
     return map as WorldMap;
 };
 
@@ -254,6 +255,8 @@ const App: React.FC = () => {
             if (newWorldMap[change.region]) {
                 if (change.militaryPresence) newWorldMap[change.region].militaryPresence = change.militaryPresence;
                 if (change.newController) newWorldMap[change.region].controlledBy = change.newController;
+                if (typeof change.fortificationLevel === 'number') newWorldMap[change.region].fortificationLevel = change.fortificationLevel;
+                if (typeof change.isContested === 'boolean') newWorldMap[change.region].isContested = change.isContested;
             }
         });
     
@@ -317,7 +320,7 @@ const App: React.FC = () => {
             newMilitary[unit] = Math.max(0, (newMilitary[unit] || 0) + (changes.military[unit] || 0));
         }
 
-        const newWorldMap = { ...stats.worldMap };
+        const newWorldMap = JSON.parse(JSON.stringify(stats.worldMap)); // Deep copy
         changes.mapChanges.forEach(change => {
             if (newWorldMap[change.region]) {
                 if (change.newController) newWorldMap[change.region].controlledBy = change.newController;
@@ -329,7 +332,9 @@ const App: React.FC = () => {
                          newWorldMap[change.region].hasPlayerMilitary = false;
                     }
                 }
-                if (change.militaryPresence) newWorldMap[change.region].militaryPresence = change.militaryPresence;
+                if (change.militaryPresence) newWorldMap[change.region].militaryPresence = { ...newWorldMap[change.region].militaryPresence, ...change.militaryPresence };
+                if (typeof change.fortificationLevel === 'number') newWorldMap[change.region].fortificationLevel = change.fortificationLevel;
+                if (typeof change.isContested === 'boolean') newWorldMap[change.region].isContested = change.isContested;
             }
         });
 

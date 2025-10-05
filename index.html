@@ -74,6 +74,19 @@
         display: inline-block;
         animation: blink 1s step-end infinite;
       }
+      @keyframes pulse-red {
+        0%, 100% {
+          stroke: rgba(239, 68, 68, 0.7);
+          stroke-width: 2;
+        }
+        50% {
+          stroke: rgba(239, 68, 68, 1);
+          stroke-width: 3;
+        }
+      }
+      .contested-zone {
+        animation: pulse-red 2s infinite;
+      }
       .animate-fade-in { animation: fadeIn 0.8s ease-out forwards; }
       .animate-slide-in-up { animation: slideInUp 0.6s ease-out forwards; opacity: 0; }
     </style>

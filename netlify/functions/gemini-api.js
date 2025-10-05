@@ -12,6 +12,14 @@ HỆ THỐNG BẢN ĐỒ VÀ LÃNH THỔ:
 -   Các thay đổi trên bản đồ (chiếm lãnh thổ, di chuyển quân) phải được trả về trong 'mapChanges'.
 -   Các hành động và sự kiện phải có logic về mặt địa lý. Ví dụ: tấn công 'western_europe' từ 'east_asia' là không hợp lý nếu không có lực lượng hải quân hoặc căn cứ ở gần đó.
 
+HỆ THỐNG CHI TIẾT BẢN ĐỒ & YẾU TỐ CHIẾN LƯỢC:
+-   Mỗi khu vực có các thuộc tính chiến lược bổ sung:
+    -   'fortificationLevel' (Cấp độ Công sự): Một con số từ 1 (không có) đến 5 (pháo đài). Công sự cao hơn mang lại lợi thế phòng thủ lớn trong chiến đấu.
+    -   'strategicResource' (Tài nguyên Chiến lược): Có thể là 'oil', 'minerals', hoặc 'gas'. Việc kiểm soát các tài nguyên này mang lại lợi ích kinh tế thụ động (tự động áp dụng vào thay đổi kinh tế).
+    -   'isContested' (Đang tranh chấp): Một cờ boolean (true/false) cho biết khu vực này đang có giao tranh hoặc bất ổn. Các khu vực đang tranh chấp có thể tự động thay đổi phe nếu không được kiểm soát.
+-   Khi bắt đầu một trò chơi mới (lượt đầu tiên), hãy phân bổ ngẫu nhiên các tài nguyên chiến lược và mức độ công sự ban đầu (chủ yếu là 1 hoặc 2) cho các khu vực trên bản đồ. Các khu vực quan trọng như Tây Âu hoặc Bắc Mỹ nên có công sự cao hơn một chút. Biến Trung Đông thành khu vực tranh chấp ngay từ đầu.
+-   Các hành động của người chơi (ví dụ: "xây dựng công sự ở [khu vực]") có thể tăng 'fortificationLevel'. Các cuộc tấn công và ném bom có thể làm giảm nó. Hãy phản ánh những thay đổi này trong 'mapChanges'.
+
 HỆ THỐNG LIÊN MINH:
 -   Người chơi bắt đầu với phe 'player'. Họ có thể tạo liên minh của riêng mình bằng các lệnh như "thành lập liên minh [Tên Liên minh]".
 -   **QUAN TRỌNG:** Người chơi KHÔNG THỂ tham gia Liên minh Phương Đông hoặc Liên minh Phương Tây. Họ chỉ có thể tạo liên minh của riêng mình. Nếu người chơi cố gắng tham gia một liên minh NPC, hãy từ chối yêu cầu một cách lịch sự trong 'outcome' và 'scenario', giải thích rằng họ phải duy trì quyền tự chủ của mình.
@@ -23,10 +31,10 @@ HỆ THỐNG LIÊN MINH:
 HỆ THỐNG QUÂN SỰ KHU VỰC VÀ CHIẾN ĐẤU:
 -   Mỗi khu vực do NPC kiểm soát có một lực lượng quân sự đồn trú, được thể hiện trong 'worldMap.<region>.militaryPresence'.
 -   Khi bắt đầu trò chơi, hãy phân bổ lực lượng quân sự ban đầu cho các phe NPC (Liên minh Phương Đông và Phương Tây) vào các vùng lãnh thổ của họ. Giả sử mỗi phe có tổng sức mạnh quân sự ban đầu gấp khoảng 1.5 lần người chơi.
--   **QUYẾT ĐỊNH KẾT QUẢ CHIẾN ĐẤU:** Khi người chơi tấn công một khu vực, kết quả phải dựa trên việc so sánh lực lượng.
-    -   So sánh tổng lực lượng quân sự của người chơi (nếu 'hasPlayerMilitary' là true tại khu vực đó) với 'militaryPresence' của phe phòng thủ.
+-   **QUYẾT ĐỊNH KẾT QUẢ CHIẾN ĐẤU:** Khi người chơi tấn công một khu vực, kết quả phải dựa trên việc so sánh lực lượng VÀ công sự.
+    -   So sánh tổng lực lượng quân sự của người chơi (nếu 'hasPlayerMilitary' là true tại khu vực đó) với 'militaryPresence' của phe phòng thủ. Yếu tố 'fortificationLevel' của khu vực phòng thủ sẽ làm tăng hiệu quả của quân phòng thủ.
     -   Nếu người chơi có ưu thế vượt trội, họ sẽ chiến thắng với tổn thất tối thiểu.
-    -   Nếu lực lượng cân bằng, cả hai bên sẽ chịu tổn thất nặng nề, kết quả không chắc chắn.
+    -   Nếu lực lượng cân bằng, cả hai bên sẽ chịu tổn thất nặng nề, kết quả không chắc chắn. Công sự cao có thể giúp phe phòng thủ chiến thắng.
     -   Nếu người chơi yếu thế hơn, họ sẽ thất bại và chịu tổn thất lớn.
 -   Sau mỗi trận chiến, hãy cập nhật 'statChanges' (tổn thất của người chơi) và 'mapChanges.militaryPresence' (tổn thất của NPC) một cách hợp lý. Nếu người chơi thắng, 'militaryPresence' của phe phòng thủ tại khu vực đó sẽ bị xóa sổ hoặc giảm mạnh, và 'newController' sẽ là 'player' hoặc 'player_alliance'.
 
@@ -87,7 +95,9 @@ const responseSchema = {
                                     navy: { type: 'INTEGER' },
                                     airforce: { type: 'INTEGER' },
                                 }
-                            }
+                            },
+                            fortificationLevel: { type: 'INTEGER', description: "Cấp độ công sự mới của khu vực (1-5)." },
+                            isContested: { type: 'BOOLEAN', description: "Khu vực có đang bị tranh chấp hay không." }
                         },
                         required: ['region']
                     }
@@ -147,6 +157,7 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
                 responseMimeType: "application/json",
                 responseSchema,
                 temperature: 0.8,
+                thinkingConfig: { thinkingBudget: 0 }
             }
         });
 
