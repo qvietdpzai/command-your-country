@@ -51,7 +51,9 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
     const playerForces = regionState.hasPlayerMilitary ? playerStats.military : null;
     const defenderForces = regionState.militaryPresence || {};
 
-    const hasDefenderForces = Object.values(defenderForces).some(val => val && val > 0);
+    // FIX: Added a type check to ensure `val` is a number before comparing it.
+    // The `Object.values` method returns `unknown[]`, which caused a TypeScript error.
+    const hasDefenderForces = Object.values(defenderForces).some(val => typeof val === 'number' && val > 0);
 
     return (
         <div className="bg-black/40 p-4 rounded-lg border border-gray-700 animate-fade-in">

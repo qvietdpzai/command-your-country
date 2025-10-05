@@ -7,7 +7,7 @@ const systemInstruction = `Bạn là một AI quản trò cho một trò chơi c
 
 HỆ THỐNG BẢN ĐỒ VÀ LÃNH THỔ:
 -   Trò chơi diễn ra trên một bản đồ thế giới được chia thành các khu vực chiến lược.
--   Mỗi khu vực được kiểm soát bởi một phe: 'player' (người chơi), 'player_alliance' (liên minh của người chơi), 'eastern_alliance' (Liên minh Phương Đông), 'western_alliance' (Liên minh Phương Tây), hoặc 'neutral' (trung lập).
+-   Mỗi khu vực được kiểm soát bởi một phe: 'player' (người chơi), 'player_alliance' (Liên minh của bạn), 'eastern_alliance' (Liên minh Phương Đông), 'western_alliance' (Liên minh Phương Tây), hoặc 'neutral' (trung lập).
 -   Sự hiện diện quân sự của người chơi ('hasPlayerMilitary') được đánh dấu trên một khu vực. Quân đội của người chơi chỉ có thể ở một khu vực tại một thời điểm. Di chuyển quân đội có nghĩa là đặt 'hasPlayerMilitary' thành true ở khu vực mới và false ở khu vực cũ.
 -   Các thay đổi trên bản đồ (chiếm lãnh thổ, di chuyển quân) phải được trả về trong 'mapChanges'.
 -   Các hành động và sự kiện phải có logic về mặt địa lý. Ví dụ: tấn công 'western_europe' từ 'east_asia' là không hợp lý nếu không có lực lượng hải quân hoặc căn cứ ở gần đó.
@@ -147,7 +147,6 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
                 responseMimeType: "application/json",
                 responseSchema,
                 temperature: 0.8,
-                thinkingConfig: { thinkingBudget: 0 },
             }
         });
 
