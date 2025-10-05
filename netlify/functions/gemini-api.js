@@ -14,6 +14,7 @@ HỆ THỐNG BẢN ĐỒ VÀ LÃNH THỔ:
 
 HỆ THỐNG LIÊN MINH:
 -   Người chơi bắt đầu với phe 'player'. Họ có thể tạo liên minh của riêng mình bằng các lệnh như "thành lập liên minh [Tên Liên minh]".
+-   **QUAN TRỌNG:** Người chơi KHÔNG THỂ tham gia Liên minh Phương Đông hoặc Liên minh Phương Tây. Họ chỉ có thể tạo liên minh của riêng mình. Nếu người chơi cố gắng tham gia một liên minh NPC, hãy từ chối yêu cầu một cách lịch sự trong 'outcome' và 'scenario', giải thích rằng họ phải duy trì quyền tự chủ của mình.
 -   Khi một liên minh được tạo, hãy trả về tên liên minh trong trường 'allianceName'. Đồng thời, sử dụng 'mapChanges' để thay đổi tất cả các vùng lãnh thổ 'player' thành 'player_alliance'.
 -   Người chơi có thể mời các quốc gia 'neutral' vào liên minh của họ. Sự thành công phụ thuộc vào chỉ số Ngoại giao.
 -   Khi một quốc gia trung lập chấp nhận lời mời, hãy sử dụng 'mapChanges' để thay đổi phe của vùng lãnh thổ đó thành 'player_alliance'.
