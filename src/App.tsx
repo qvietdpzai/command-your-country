@@ -124,6 +124,7 @@ const App: React.FC = () => {
     const [playerInput, setPlayerInput] = useState('');
     const [tempNationName, setTempNationName] = useState('');
     const [hasSaveGame, setHasSaveGame] = useState(false);
+    const [isMusicOn, setIsMusicOn] = useState(false);
     const audioInitialized = useRef(false);
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
 
@@ -132,16 +133,27 @@ const App: React.FC = () => {
         setHasSaveGame(!!savedGame);
     }, []);
 
-    const initializeAudio = () => {
+    const initializeAudio = useCallback(() => {
         if (!audioInitialized.current) {
             soundService.init();
             audioInitialized.current = true;
         }
-    };
+    }, []);
 
     const playSoundWithInit = (sound: SoundName) => {
         initializeAudio();
         soundService.playSound(sound);
+    };
+
+    const toggleMusic = () => {
+        initializeAudio();
+        if (soundService.isMusicPlaying()) {
+            soundService.stopMusic();
+            setIsMusicOn(false);
+        } else {
+            soundService.playMusic();
+            setIsMusicOn(true);
+        }
     };
 
     const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse | null, currentEventLog: string[]) => {
@@ -207,7 +219,7 @@ const App: React.FC = () => {
         saveGame(currentStats, initialTurn, newLog);
         setIsLoading(false);
         playSoundWithInit('receive_response');
-    }, [tempNationName, isLoading]);
+    }, [tempNationName, isLoading, playSoundWithInit]);
 
     const resetGame = () => {
         playSoundWithInit('ui_click');
@@ -275,7 +287,6 @@ const App: React.FC = () => {
             economicGrowth: stats.economicGrowth + changes.economicGrowth,
             worldMap: newWorldMap,
             policies: [nextTurnData.policySummary, ...stats.policies],
-            allianceName: nextTurnData.allianceName || stats.allianceName,
         };
 
         setStats(newStats);
@@ -284,7 +295,7 @@ const App: React.FC = () => {
         setEventLog(finalEventLog);
         setIsLoading(false);
 
-        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player' || r.controlledBy === 'player_alliance');
+        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player');
         if (!playerHasTerritory) {
             setGameState('gameOver');
             setGameOverMessage("Bạn đã mất quyền kiểm soát tất cả các vùng lãnh thổ. Quốc gia của bạn đã bị xóa sổ khỏi bản đồ thế giới.");
@@ -293,7 +304,7 @@ const App: React.FC = () => {
         } else {
             saveGame(newStats, nextTurnData, finalEventLog);
         }
-    }, [isLoading, stats, playerInput, eventLog, gameState]);
+    }, [isLoading, stats, playerInput, eventLog, gameState, playSoundWithInit]);
 
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -349,13 +360,7 @@ const App: React.FC = () => {
                         <div className="lg:col-span-2 flex flex-col gap-6">
                             <div className="bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
                                 <NationalEmblem nationName={stats.nationName} imageUrl={stats.emblemImageUrl} isLoading={isLoading && !stats.emblemImageUrl} />
-                                {stats.allianceName && (
-                                    <div className="text-center -mt-2 mb-2">
-                                        <p className="text-sm text-gray-400">Thành viên của</p>
-                                        <p className="font-bold text-lg text-purple-400 tracking-wide">{stats.allianceName}</p>
-                                    </div>
-                                )}
-                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2">TRẠNG THÁI QUỐC GIA</h2>
+                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 -mt-2">TRẠNG THÁI QUỐC GIA</h2>
                                 <div className="space-y-3">
                                     <StatDisplay icon="economy" label="Kinh tế" value={formatNumber(stats.economy)} unit="Tỷ USD" />
                                     <StatDisplay icon="manpower" label="Nhân lực" value={formatNumber(stats.manpower)} />
@@ -438,6 +443,14 @@ const App: React.FC = () => {
             <main className="w-full max-w-6xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700 glow-border">
                 {renderContent()}
             </main>
+            <button
+                onClick={toggleMusic}
+                className="absolute top-4 right-4 z-20 p-2 bg-black/30 rounded-full text-gray-400 hover:text-white hover:bg-black/50 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                aria-label={isMusicOn ? "Tắt nhạc" : "Bật nhạc"}
+                title={isMusicOn ? "Tắt nhạc" : "Bật nhạc"}
+            >
+                {isMusicOn ? <Icon name="music_on" className="w-6 h-6" /> : <Icon name="music_off" className="w-6 h-6" />}
+            </button>
             <footer className="absolute bottom-4 text-center text-gray-600 text-xs z-10">
                 <p>Một trải nghiệm chiến lược được cung cấp bởi Google Gemini API.</p>
             </footer>

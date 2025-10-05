@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth';
+    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off';
 }
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
@@ -140,6 +140,23 @@ export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
                     <path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
                     <line x1="12" y1="9" x2="12" y2="13"></line>
                     <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            );
+        case 'music_on':
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <circle cx="18" cy="16" r="3"/>
+                </svg>
+            );
+        case 'music_off':
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <line x1="2" y1="2" x2="22" y2="22" />
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
                 </svg>
             );
         default:
