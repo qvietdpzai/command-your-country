@@ -1,5 +1,5 @@
 import React from 'react';
-import { RegionID, WorldMap, GameStats, FactionID, MilitaryStats } from '../types';
+import { RegionID, WorldMap, GameStats, FactionID } from '../types';
 import { Icon } from './icons';
 
 const formatNumber = (num: number): string => new Intl.NumberFormat('en-US').format(num);
