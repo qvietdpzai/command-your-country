@@ -1,5 +1,5 @@
 import React from 'react';
-import { WorldMap as WorldMapData, RegionID, FactionID, MilitaryStats, StrategicResource } from '../types';
+import { WorldMap as WorldMapData, RegionID, FactionID, StrategicResource, ArmyCorps } from '../types';
 import { Icon } from './icons';
 
 const FACTION_COLORS: Record<FactionID, string> = {
@@ -23,7 +23,6 @@ const RESOURCE_ICONS: Record<StrategicResource, 'oil' | 'minerals' | 'gas'> = {
     minerals: 'minerals',
     gas: 'gas'
 };
-
 
 const REGION_DATA: Record<RegionID, { path: string, center: [number, number], name: string }> = {
     north_america: { path: "M 48,93 L 48,50 L 115,10 L 175,30 L 180,95 L 125,125 Z", center: [115, 75], name: "Bắc Mỹ" },
@@ -49,22 +48,12 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
 
 interface WorldMapProps {
     mapData: WorldMapData;
+    armyCorps: ArmyCorps[];
     onRegionSelect: (regionId: RegionID) => void;
     selectedRegion: RegionID | null;
-    playerMilitaryStats: MilitaryStats;
 }
 
-const formatTotalStrength = (military: Partial<MilitaryStats> | undefined): string => {
-    if (!military) return '';
-    const total = (military.infantry || 0) + (military.armor || 0) + (military.navy || 0) + (military.airforce || 0);
-    if (total <= 0) return '';
-    if (total < 1000) return total.toString();
-    return `${Math.floor(total / 1000)}k`;
-};
-
-export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, selectedRegion, playerMilitaryStats }) => {
-    const playerMilitaryRegion = Object.keys(mapData).find(key => mapData[key as RegionID].hasPlayerMilitary) as RegionID | undefined;
-
+export const WorldMap: React.FC<WorldMapProps> = ({ mapData, armyCorps, onRegionSelect, selectedRegion }) => {
     return (
         <div className="mt-4 flex flex-col items-center">
             <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢC TOÀN CẦU</h3>
@@ -85,7 +74,6 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
 
                     <rect x="0" y="0" width="560" height="210" fill="#1a202c" />
 
-                    {/* Region Paths and Icons */}
                     {Object.keys(REGION_DATA).map(key => {
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
@@ -107,12 +95,9 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
                                 <path d={region.path} fill="url(#land-texture)" className="pointer-events-none" opacity="0.5" />
 
                                 {regionState.isContested && <path d={region.path} className="fill-none contested-zone pointer-events-none" />}
-                                <title>{title}</title>
                                 
-                                {/* Icons inside region */}
                                 <g transform={`translate(${region.center[0]}, ${region.center[1]})`} className="pointer-events-none">
                                     {regionState.fortificationLevel > 1 && (
-                                        // FIX: Replaced `title` attribute with a `<title>` element for SVG tooltip.
                                         <g transform="translate(-20, 8)">
                                             <title>{`Cấp độ công sự: ${regionState.fortificationLevel}`}</title>
                                             <Icon name="fortification" className="w-4 h-4 text-gray-200" stroke="black" strokeWidth={1}/>
@@ -120,69 +105,28 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionSelect, sel
                                         </g>
                                     )}
                                     {regionState.strategicResource && (
-                                        // FIX: Replaced `title` attribute with a `<title>` element for SVG tooltip.
                                         <g transform="translate(12, 8)">
                                             <title>{`Tài nguyên: ${regionState.strategicResource}`}</title>
                                             <Icon name={RESOURCE_ICONS[regionState.strategicResource]} className="w-4 h-4 text-yellow-300" stroke="black" strokeWidth={1} />
                                         </g>
                                     )}
                                 </g>
+                                <title>{title}</title>
                             </g>
                         );
                     })}
 
-                    {/* NPC Military Presence */}
-                    {Object.keys(mapData).map(key => {
-                        const regionId = key as RegionID;
-                        const regionState = mapData[regionId];
-                        const regionDisplayData = REGION_DATA[regionId];
-                        const isPlayerControlled = regionState.controlledBy === 'player' || regionState.controlledBy === 'player_alliance';
-                        
-                        if (!isPlayerControlled && regionState.militaryPresence) {
-                            const totalStrength = formatTotalStrength(regionState.militaryPresence);
-                            if (totalStrength) {
-                                return (
-                                    <text
-                                        key={`${regionId}-strength`}
-                                        x={regionDisplayData.center[0]}
-                                        y={regionDisplayData.center[1] + 4}
-                                        textAnchor="middle"
-                                        className="fill-white font-bold pointer-events-none"
-                                        stroke="black"
-                                        strokeWidth="0.4"
-                                    >
-                                        {totalStrength}
-                                    </text>
-                                );
-                            }
-                        }
-                        return null;
-                    })}
-                    
-                    {/* Player Military Presence (Star + Count) */}
-                    {playerMilitaryRegion && (
-                        <g transform={`translate(${REGION_DATA[playerMilitaryRegion].center[0]}, ${REGION_DATA[playerMilitaryRegion].center[1]})`} className="pointer-events-none">
-                            <g transform="translate(-8, 0)">
-                                <path 
-                                    d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z"
-                                    className="fill-yellow-300 stroke-black" 
-                                    strokeWidth="0.5"
-                                    style={{ filter: 'url(#glow)' }}
-                                />
+                    {armyCorps.map((corps, index) => {
+                         const regionCenter = REGION_DATA[corps.location].center;
+                         // Offset icons if multiple corps are in the same region
+                         const offset = armyCorps.filter(c => c.location === corps.location).length > 1 ? (index % 4) * 12 - 18 : 0;
+                        return (
+                             <g key={corps.id} transform={`translate(${regionCenter[0] + offset}, ${regionCenter[1] - 8})`} className="pointer-events-none">
+                                <Icon name="army_corps" className="w-5 h-5 fill-yellow-300 stroke-black" strokeWidth="1" style={{ filter: 'url(#glow)' }} />
+                                <title>{`Quân đoàn: ${corps.name}`}</title>
                             </g>
-                            <text
-                                x="4"
-                                y="4"
-                                textAnchor="start"
-                                className="fill-yellow-300 font-bold"
-                                stroke="black"
-                                strokeWidth="0.4"
-                            >
-                                {formatTotalStrength(playerMilitaryStats)}
-                            </text>
-                            <title>Sự hiện diện quân sự của bạn: {formatTotalStrength(playerMilitaryStats).replace('k', ',000')}</title>
-                        </g>
-                    )}
+                        )
+                    })}
                 </svg>
             </div>
             <div className="w-full mt-2 px-2">

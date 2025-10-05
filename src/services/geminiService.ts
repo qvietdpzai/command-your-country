@@ -45,7 +45,8 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
             outcome,
             scenario,
             statChanges: { 
-                military: {}, 
+                // Fix: Replaced 'military: {}' with 'armyCorpsChanges: []' to align with the StatChanges type.
+                armyCorpsChanges: [],
                 economy: 0, 
                 manpower: 0,
                 morale: 0, 

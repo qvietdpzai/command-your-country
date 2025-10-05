@@ -1,5 +1,5 @@
 import React from 'react';
-import { RegionID, WorldMap, GameStats, FactionID, StrategicResource } from '../types';
+import { RegionID, WorldMap, FactionID, StrategicResource, ArmyCorps } from '../types';
 import { Icon } from './icons';
 
 const formatNumber = (num: number): string => new Intl.NumberFormat('en-US').format(num);
@@ -43,18 +43,18 @@ const RESOURCE_ICONS: Record<StrategicResource, 'oil' | 'minerals' | 'gas'> = {
 interface RegionDetailProps {
     selectedRegion: RegionID;
     mapData: WorldMap;
-    playerStats: GameStats;
+    playerArmyCorps: ArmyCorps[];
     onClose: () => void;
 }
 
-export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapData, playerStats, onClose }) => {
+export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapData, playerArmyCorps, onClose }) => {
     const regionState = mapData[selectedRegion];
     if (!regionState) return null;
 
     const regionName = REGION_NAMES[selectedRegion];
     const controllingFaction = regionState.controlledBy;
     
-    const playerForces = regionState.hasPlayerMilitary ? playerStats.military : null;
+    const playerCorpsInRegion = playerArmyCorps.filter(corps => corps.location === selectedRegion);
     const defenderForces = regionState.militaryPresence || {};
 
     const hasDefenderForces = Object.values(defenderForces).some(val => typeof val === 'number' && val > 0);
@@ -94,16 +94,21 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
                 <p className="text-sm font-bold text-red-400 animate-pulse mb-3 text-center bg-red-900/50 py-1 rounded">VÙNG TRANH CHẤP</p>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4">
                 <div>
-                    <h4 className="font-bold text-blue-400 mb-2 border-b border-blue-400/30 pb-1">Lực lượng của bạn</h4>
-                    {playerForces ? (
-                         <div className="space-y-1 mt-2">
-                            <ForceStat icon="infantry" value={playerForces.infantry} />
-                            <ForceStat icon="armor" value={playerForces.armor} />
-                            <ForceStat icon="navy" value={playerForces.navy} />
-                            <ForceStat icon="airforce" value={playerForces.airforce} />
-                        </div>
+                    <h4 className="font-bold text-blue-400 mb-2 border-b border-blue-400/30 pb-1">Quân đoàn của bạn</h4>
+                    {playerCorpsInRegion.length > 0 ? (
+                        playerCorpsInRegion.map(corps => (
+                             <div key={corps.id} className="mt-2">
+                                <p className='font-semibold text-white'>{corps.name}</p>
+                                <div className="space-y-1 pl-4">
+                                    <ForceStat icon="infantry" value={corps.composition.infantry} />
+                                    <ForceStat icon="armor" value={corps.composition.armor} />
+                                    <ForceStat icon="navy" value={corps.composition.navy} />
+                                    <ForceStat icon="airforce" value={corps.composition.airforce} />
+                                </div>
+                            </div>
+                        ))
                     ) : (
                         <p className="text-gray-500 italic text-sm mt-2">Chưa triển khai tại đây</p>
                     )}
@@ -112,7 +117,7 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
                 <div>
                     <h4 className="font-bold text-red-400 mb-2 border-b border-red-400/30 pb-1">Lực lượng phòng thủ</h4>
                     {hasDefenderForces ? (
-                        <div className="space-y-1 mt-2">
+                        <div className="space-y-1 mt-2 pl-4">
                             <ForceStat icon="infantry" value={defenderForces.infantry} />
                             <ForceStat icon="armor" value={defenderForces.armor} />
                             <ForceStat icon="navy" value={defenderForces.navy} />

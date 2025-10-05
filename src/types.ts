@@ -18,9 +18,22 @@ export type RegionID =
 
 export type StrategicResource = 'oil' | 'minerals' | 'gas';
 
+export interface MilitaryStats {
+    infantry: number;
+    armor: number;
+    navy: number;
+    airforce: number;
+}
+
+export interface ArmyCorps {
+    id: string;
+    name: string;
+    location: RegionID;
+    composition: MilitaryStats;
+}
+
 export interface RegionState {
     controlledBy: FactionID;
-    hasPlayerMilitary: boolean;
     militaryPresence?: Partial<MilitaryStats>; // Troops stationed in the region
     fortificationLevel: number; // e.g., 1-5
     strategicResource?: StrategicResource | null;
@@ -32,27 +45,24 @@ export type WorldMap = Record<RegionID, RegionState>;
 export interface MapChange {
     region: RegionID;
     newController?: FactionID;
-    playerMilitary?: boolean; // true to place/move, false to remove, undefined to not change
     militaryPresence?: Partial<MilitaryStats>; // New troop numbers in the region after events
     fortificationLevel?: number;
     isContested?: boolean;
 }
 
-export interface MilitaryStats {
-    infantry: number;
-    armor: number;
-    navy: number;
-    airforce: number;
+export interface ArmyCorpsChange {
+    action: 'CREATE' | 'UPDATE' | 'DELETE';
+    corps: Partial<ArmyCorps> & { id: string }; // For DELETE, only id is needed. For UPDATE, id and changed fields. For CREATE, full object.
 }
 
 export interface GameStats {
-    military: MilitaryStats;
+    armyCorps: ArmyCorps[];
     economy: number; // In billions USD
     manpower: number; // Total available personnel
     morale: number; // 0-100 scale
     diplomacy: number; // 0-100 scale
     economicGrowth: number; // Percentage
-    worldMap: WorldMap; // Replaces territoryControl
+    worldMap: WorldMap; 
     policies: string[];
     nationName: string;
     emblemImageUrl: string | null;
@@ -60,13 +70,13 @@ export interface GameStats {
 }
 
 export interface StatChanges {
-    military: Partial<MilitaryStats>;
+    armyCorpsChanges: ArmyCorpsChange[];
     economy: number;
     manpower: number;
     morale: number;
     diplomacy: number;
     economicGrowth: number;
-    mapChanges: MapChange[]; // Replaces territoryControlChange
+    mapChanges: MapChange[];
 }
 
 export interface TurnResponse {

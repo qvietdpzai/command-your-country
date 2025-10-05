@@ -5,47 +5,32 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.
 
-HỆ THỐNG BẢN ĐỒ VÀ LÃNH THỔ:
--   Trò chơi diễn ra trên một bản đồ thế giới được chia thành các khu vực chiến lược.
--   Mỗi khu vực được kiểm soát bởi một phe: 'player' (người chơi), 'player_alliance' (Liên minh của bạn), 'eastern_alliance' (Liên minh Phương Đông), 'western_alliance' (Liên minh Phương Tây), hoặc 'neutral' (trung lập).
--   Sự hiện diện quân sự của người chơi ('hasPlayerMilitary') được đánh dấu trên một khu vực. Quân đội của người chơi chỉ có thể ở một khu vực tại một thời điểm. Di chuyển quân đội có nghĩa là đặt 'hasPlayerMilitary' thành true ở khu vực mới và false ở khu vực cũ.
--   Các thay đổi trên bản đồ (chiếm lãnh thổ, di chuyển quân) phải được trả về trong 'mapChanges'.
--   Các hành động và sự kiện phải có logic về mặt địa lý. Ví dụ: tấn công 'western_europe' từ 'east_asia' là không hợp lý nếu không có lực lượng hải quân hoặc căn cứ ở gần đó.
+HỆ THỐNG QUÂN ĐOÀN:
+-   Quân đội của người chơi được chia thành các Quân đoàn ('ArmyCorps'). Mỗi quân đoàn là một thực thể riêng biệt có ID, tên, vị trí và thành phần quân sự.
+-   Người chơi có thể ra lệnh tạo, di chuyển, tấn công, chia tách hoặc sáp nhập các quân đoàn.
+-   Tạo quân đoàn mới sẽ trừ vào 'manpower' (nhân lực) và 'economy' (kinh tế) của người chơi.
+-   Khi một quân đoàn di chuyển, hãy cập nhật thuộc tính 'location' của nó.
+-   Khi một quân đoàn bị tiêu diệt, hãy xóa nó khỏi danh sách.
+-   Tất cả các thay đổi về quân đoàn (tạo, cập nhật, xóa) phải được trả về trong 'armyCorpsChanges'.
+-   ID của quân đoàn mới phải là duy nhất, ví dụ: 'corps-' + một con số tăng dần hoặc một chuỗi ngẫu nhiên.
 
-HỆ THỐNG CHI TIẾT BẢN ĐỒ & YẾU TỐ CHIẾN LƯỢC:
--   Mỗi khu vực có các thuộc tính chiến lược bổ sung:
-    -   'fortificationLevel' (Cấp độ Công sự): Một con số từ 1 (không có) đến 5 (pháo đài). Công sự cao hơn mang lại lợi thế phòng thủ lớn trong chiến đấu.
-    -   'strategicResource' (Tài nguyên Chiến lược): Có thể là 'oil', 'minerals', hoặc 'gas'. Việc kiểm soát các tài nguyên này mang lại lợi ích kinh tế thụ động (tự động áp dụng vào thay đổi kinh tế).
-    -   'isContested' (Đang tranh chấp): Một cờ boolean (true/false) cho biết khu vực này đang có giao tranh hoặc bất ổn. Các khu vực đang tranh chấp có thể tự động thay đổi phe nếu không được kiểm soát.
--   Khi bắt đầu một trò chơi mới (lượt đầu tiên), hãy phân bổ ngẫu nhiên các tài nguyên chiến lược và mức độ công sự ban đầu (chủ yếu là 1 hoặc 2) cho các khu vực trên bản đồ. Các khu vực quan trọng như Tây Âu hoặc Bắc Mỹ nên có công sự cao hơn một chút. Biến Trung Đông thành khu vực tranh chấp ngay từ đầu.
--   Các hành động của người chơi (ví dụ: "xây dựng công sự ở [khu vực]") có thể tăng 'fortificationLevel'. Các cuộc tấn công và ném bom có thể làm giảm nó. Hãy phản ánh những thay đổi này trong 'mapChanges'.
-
-HỆ THỐNG LIÊN MINH:
--   Người chơi bắt đầu với phe 'player'. Họ có thể tạo liên minh của riêng mình bằng các lệnh như "thành lập liên minh [Tên Liên minh]".
--   **QUAN TRỌNG:** Người chơi KHÔNG THỂ tham gia Liên minh Phương Đông hoặc Liên minh Phương Tây. Họ chỉ có thể tạo liên minh của riêng mình. Nếu người chơi cố gắng tham gia một liên minh NPC, hãy từ chối yêu cầu một cách lịch sự trong 'outcome' và 'scenario', giải thích rằng họ phải duy trì quyền tự chủ của mình.
--   Khi một liên minh được tạo, hãy trả về tên liên minh trong trường 'allianceName'. Đồng thời, sử dụng 'mapChanges' để thay đổi tất cả các vùng lãnh thổ 'player' thành 'player_alliance'.
--   Người chơi có thể mời các quốc gia 'neutral' vào liên minh của họ. Sự thành công phụ thuộc vào chỉ số Ngoại giao.
--   Khi một quốc gia trung lập chấp nhận lời mời, hãy sử dụng 'mapChanges' để thay đổi phe của vùng lãnh thổ đó thành 'player_alliance'.
--   Các phe NPC (Liên minh Phương Đông, Liên minh Phương Tây) cũng có thể thuyết phục các quốc gia trung lập tham gia cùng họ. Hãy mô tả những sự kiện này trong 'worldStatus' và cập nhật bản đồ tương ứng.
-
-HỆ THỐNG QUÂN SỰ KHU VỰC VÀ CHIẾN ĐẤU:
--   Mỗi khu vực do NPC kiểm soát có một lực lượng quân sự đồn trú, được thể hiện trong 'worldMap.<region>.militaryPresence'.
--   Khi bắt đầu trò chơi, hãy phân bổ lực lượng quân sự ban đầu cho các phe NPC (Liên minh Phương Đông và Phương Tây) vào các vùng lãnh thổ của họ. Giả sử mỗi phe có tổng sức mạnh quân sự ban đầu gấp khoảng 1.5 lần người chơi.
--   **QUYẾT ĐỊNH KẾT QUẢ CHIẾN ĐẤU:** Khi người chơi tấn công một khu vực, kết quả phải dựa trên việc so sánh lực lượng VÀ công sự.
-    -   So sánh tổng lực lượng quân sự của người chơi (nếu 'hasPlayerMilitary' là true tại khu vực đó) với 'militaryPresence' của phe phòng thủ. Yếu tố 'fortificationLevel' của khu vực phòng thủ sẽ làm tăng hiệu quả của quân phòng thủ.
-    -   Nếu người chơi có ưu thế vượt trội, họ sẽ chiến thắng với tổn thất tối thiểu.
-    -   Nếu lực lượng cân bằng, cả hai bên sẽ chịu tổn thất nặng nề, kết quả không chắc chắn. Công sự cao có thể giúp phe phòng thủ chiến thắng.
-    -   Nếu người chơi yếu thế hơn, họ sẽ thất bại và chịu tổn thất lớn.
--   Sau mỗi trận chiến, hãy cập nhật 'statChanges' (tổn thất của người chơi) và 'mapChanges.militaryPresence' (tổn thất của NPC) một cách hợp lý. Nếu người chơi thắng, 'militaryPresence' của phe phòng thủ tại khu vực đó sẽ bị xóa sổ hoặc giảm mạnh, và 'newController' sẽ là 'player' hoặc 'player_alliance'.
+HỆ THỐNG BẢN ĐỒ VÀ CHIẾN ĐẤU:
+-   Bản đồ được chia thành các khu vực, mỗi khu vực có công sự ('fortificationLevel'), tài nguyên ('strategicResource'), quân đồn trú của NPC ('militaryPresence'), và có thể bị tranh chấp ('isContested').
+-   **CHIẾN ĐẤU:** Khi người chơi ra lệnh tấn công bằng một quân đoàn cụ thể (ví dụ: "Dùng Quân đoàn 1 tấn công Tây Âu"), hãy so sánh sức mạnh của quân đoàn đó với quân đồn trú và công sự của khu vực phòng thủ.
+    -   Tính toán tổn thất cho cả hai bên.
+    -   Phản ánh tổn thất của người chơi bằng cách cập nhật thành phần của quân đoàn tấn công trong 'armyCorpsChanges'.
+    -   Phản ánh tổn thất của NPC bằng cách cập nhật 'militaryPresence' của khu vực trong 'mapChanges'.
+    -   Nếu người chơi thắng, hãy cập nhật 'newController' của khu vực thành phe của người chơi và giảm mạnh hoặc xóa sổ quân đồn trú của NPC.
+-   Các khu vực do NPC kiểm soát có thể tự xây dựng quân đội theo thời gian. Hãy phản ánh điều này trong 'worldStatus' và cập nhật 'militaryPresence'.
 
 QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
 1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC chỉ có thể xảy ra nếu có lý do chính đáng.
 2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế. (D) Căng thẳng thế giới leo thang.
-3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:', nêu rõ lý do VÀ khu vực bị ảnh hưởng. Ví dụ: 'Báo động đỏ: Do các cuộc tập trận khiêu khích của bạn ở Đông Âu, Liên minh Phương Đông đã tiến hành không kích vào khu vực này, phá hủy 25 máy bay và 50 xe tăng.' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
+3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:', nêu rõ lý do VÀ khu vực bị ảnh hưởng. Nếu quân đoàn của người chơi bị tấn công, hãy chỉ rõ quân đoàn nào. Ví dụ: 'Báo động đỏ: Do các cuộc tập trận khiêu khích của bạn, Liên minh Phương Đông đã không kích vào Quân đoàn 1 ở Đông Âu, phá hủy 25 máy bay và 50 xe tăng.' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
 
 CÁC QUY TẮC KHÁC:
--   **THẾ GIỚI SỐNG ĐỘNG:** Thế giới không chỉ xoay quanh người chơi. Các quốc gia và liên minh NPC khác có thể và NÊN tương tác với nhau trên bản đồ. Một cuộc chiến giữa các NPC có thể dẫn đến thay đổi quyền kiểm soát lãnh thổ. Hãy báo cáo những sự kiện này trong 'worldStatus'.
--   Tạo ra các kết quả và kịch bản đẩy căng thẳng leo thang một cách logic.
+-   **THẾ GIỚI SỐNG ĐỘNG:** Các quốc gia NPC có thể tương tác, gây chiến với nhau. Hãy báo cáo những sự kiện này trong 'worldStatus' và cập nhật bản đồ.
+-   Khi bắt đầu một trò chơi mới, hãy phân bổ ngẫu nhiên tài nguyên và công sự. Đặt một số quân đồn trú ban đầu cho các phe NPC. Biến Trung Đông thành khu vực tranh chấp.
 -   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.`;
 
 const responseSchema = {
@@ -62,14 +47,33 @@ const responseSchema = {
         statChanges: {
             type: 'OBJECT',
             properties: {
-                military: {
-                    type: 'OBJECT',
-                    description: 'Thay đổi số lượng các đơn vị quân sự. Chỉ bao gồm các đơn vị bị ảnh hưởng.',
-                    properties: {
-                        infantry: { type: 'INTEGER', description: 'Thay đổi số lượng bộ binh.' },
-                        armor: { type: 'INTEGER', description: 'Thay đổi số lượng thiết giáp.' },
-                        navy: { type: 'INTEGER', description: 'Thay đổi số lượng tàu hải quân.' },
-                        airforce: { type: 'INTEGER', description: 'Thay đổi số lượng máy bay.' },
+                armyCorpsChanges: {
+                    type: 'ARRAY',
+                    description: "Danh sách các thay đổi đối với quân đoàn của người chơi.",
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            action: { type: 'STRING', description: "Hành động: 'CREATE', 'UPDATE', hoặc 'DELETE'." },
+                            corps: {
+                                type: 'OBJECT',
+                                properties: {
+                                    id: { type: 'STRING', description: "ID duy nhất của quân đoàn." },
+                                    name: { type: 'STRING', description: "Tên của quân đoàn." },
+                                    location: { type: 'STRING', description: "ID khu vực nơi quân đoàn đóng quân." },
+                                    composition: {
+                                        type: 'OBJECT',
+                                        properties: {
+                                            infantry: { type: 'INTEGER' },
+                                            armor: { type: 'INTEGER' },
+                                            navy: { type: 'INTEGER' },
+                                            airforce: { type: 'INTEGER' },
+                                        }
+                                    }
+                                },
+                                required: ['id']
+                            }
+                        },
+                        required: ['action', 'corps']
                     }
                 },
                 economy: { type: 'INTEGER', description: 'Thay đổi chỉ số kinh tế (tính bằng Tỷ USD).' },
@@ -84,11 +88,10 @@ const responseSchema = {
                         type: 'OBJECT',
                         properties: {
                             region: { type: 'STRING', description: "ID của khu vực bị thay đổi (ví dụ: 'western_europe')." },
-                            newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'player_alliance', 'eastern_alliance')." },
-                            playerMilitary: { type: 'BOOLEAN', description: "Sự hiện diện quân sự của người chơi (true: có, false: không)." },
+                            newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'player_alliance')." },
                             militaryPresence: {
                                 type: 'OBJECT',
-                                description: "Số lượng quân đồn trú mới trong khu vực sau các sự kiện. Chỉ bao gồm các đơn vị bị ảnh hưởng.",
+                                description: "Số lượng quân đồn trú mới trong khu vực sau các sự kiện.",
                                 properties: {
                                     infantry: { type: 'INTEGER' },
                                     armor: { type: 'INTEGER' },
@@ -103,7 +106,7 @@ const responseSchema = {
                     }
                 }
             },
-            required: ['military', 'economy', 'manpower', 'morale', 'diplomacy', 'economicGrowth', 'mapChanges']
+            required: ['armyCorpsChanges', 'economy', 'manpower', 'morale', 'diplomacy', 'economicGrowth', 'mapChanges']
         },
         policySummary: {
             type: 'STRING',
@@ -111,7 +114,7 @@ const responseSchema = {
         },
         worldStatus: {
             type: 'STRING',
-            description: 'Một hoặc hai câu mô tả tình hình địa chính trị toàn cầu hiện tại, bao gồm cả các sự kiện quan trọng giữa các NPC.'
+            description: 'Một hoặc hai câu mô tả tình hình địa chính trị toàn cầu hiện tại.'
         },
         damageReport: {
             type: 'STRING',
@@ -134,11 +137,7 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         - Liên minh: ${currentStats.allianceName || 'Chưa có'}
         - Kinh tế: ${currentStats.economy} Tỷ USD
         - Nhân lực: ${currentStats.manpower}
-        - Quân sự: 
-          - Bộ binh: ${currentStats.military.infantry}
-          - Thiết giáp: ${currentStats.military.armor}
-          - Hải quân: ${currentStats.military.navy}
-          - Không quân: ${currentStats.military.airforce}
+        - Các quân đoàn (JSON): ${JSON.stringify(currentStats.armyCorps)}
         - Tinh thần: ${currentStats.morale}/100
         - Ngoại giao: ${currentStats.diplomacy}/100
         - Tăng trưởng Kinh tế: ${currentStats.economicGrowth}%
@@ -167,7 +166,6 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         }
         
         const jsonText = response.text.trim();
-        // The model can sometimes return markdown ```json ... ```
         const cleanedJsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
 
         try {

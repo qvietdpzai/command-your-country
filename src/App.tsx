@@ -1,47 +1,47 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getNextTurn, generateNationalEmblem } from './services/geminiService';
-import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID } from './types';
+import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID, ArmyCorps } from './types';
 import { Icon } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { soundService, SoundName } from './services/soundService';
 import { RegionDetail } from './components/RegionDetail';
+import { ArmyCorpsManager } from './components/ArmyCorpsManager';
 
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
 
-// Check for SpeechRecognition API
-// Fix: Cast window to `any` to access non-standard SpeechRecognition properties.
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 const hasSpeechRecognition = !!SpeechRecognition;
 
 const createInitialMap = (): WorldMap => {
     const map: Partial<WorldMap> = {};
     REGIONS.forEach(region => {
-        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 1, isContested: false, strategicResource: null };
+        map[region] = { controlledBy: 'neutral', militaryPresence: {}, fortificationLevel: 1, isContested: false, strategicResource: null };
     });
-    // Assign starting territories and some initial flavor. The AI will override/set this on the first turn.
-    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true, militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'minerals' };
-    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'gas' };
-    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'minerals' };
-    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 1, isContested: false, strategicResource: null };
-    map['middle_east'] = { controlledBy: 'neutral', hasPlayerMilitary: false, militaryPresence: {}, fortificationLevel: 1, isContested: true, strategicResource: 'oil' };
+    map['north_america'] = { controlledBy: 'player', militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'minerals' };
+    map['western_europe'] = { controlledBy: 'western_alliance', militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'gas' };
+    map['east_asia'] = { controlledBy: 'eastern_alliance', militaryPresence: {}, fortificationLevel: 2, isContested: false, strategicResource: 'minerals' };
+    map['eastern_europe'] = { controlledBy: 'eastern_alliance', militaryPresence: {}, fortificationLevel: 1, isContested: false, strategicResource: null };
+    map['middle_east'] = { controlledBy: 'neutral', militaryPresence: {}, fortificationLevel: 1, isContested: true, strategicResource: 'oil' };
     return map as WorldMap;
 };
 
 const INITIAL_STATS: GameStats = { 
-    military: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 },
-    economy: 2000, // Billions USD
+    armyCorps: [
+        { id: 'corps-1', name: 'Quân đoàn 1', location: 'north_america', composition: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 } }
+    ],
+    economy: 2000,
     manpower: 10000000,
     morale: 70, 
     diplomacy: 60,
-    economicGrowth: 0.5, // Starting growth rate
+    economicGrowth: 0.5,
     worldMap: createInitialMap(), 
     policies: [], 
     nationName: '', 
     emblemImageUrl: null 
 };
 const MAX_MORALE_DIPLOMACY = 100;
-const SAVE_GAME_KEY = 'ww3-savegame-v3';
+const SAVE_GAME_KEY = 'ww3-savegame-v4'; // New key for army corps structure
 
 type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
@@ -122,7 +122,6 @@ const App: React.FC = () => {
     const [isMusicOn, setIsMusicOn] = useState(false);
     const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
     const [isListening, setIsListening] = useState(false);
-    // Fix: Use `any` for the ref type as `SpeechRecognition` is a variable, not a type, and the type is not globally defined.
     const recognitionRef = useRef<any | null>(null);
     const audioInitialized = useRef(false);
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
@@ -139,33 +138,23 @@ const App: React.FC = () => {
             recognition.maxAlternatives = 1;
 
             recognition.onresult = (event: any) => {
-                const transcript = event.results[0][0].transcript;
-                setPlayerInput(transcript);
+                setPlayerInput(event.results[0][0].transcript);
                 setIsListening(false);
             };
-
             recognition.onerror = (event: any) => {
                 console.error('Speech recognition error:', event.error);
                 setIsListening(false);
             };
-
-            recognition.onend = () => {
-                setIsListening(false);
-            };
-            
+            recognition.onend = () => setIsListening(false);
             recognitionRef.current = recognition;
         }
 
-        return () => {
-            recognitionRef.current?.abort();
-        };
+        return () => recognitionRef.current?.abort();
     }, []);
 
     const toggleListening = () => {
         if (isLoading || !hasSpeechRecognition) return;
-        
         initializeAudio();
-
         if (isListening) {
             recognitionRef.current?.stop();
         } else {
@@ -215,7 +204,7 @@ const App: React.FC = () => {
         if (savedGameString) {
             try {
                 const savedGame: SavedGameData = JSON.parse(savedGameString);
-                if (savedGame.stats.worldMap && savedGame.stats.worldMap.north_america) {
+                if (savedGame.stats.armyCorps) { // Check for new structure
                     setStats(savedGame.stats);
                     setTurnData(savedGame.turnData);
                     setEventLog(savedGame.eventLog);
@@ -309,29 +298,23 @@ const App: React.FC = () => {
 
         const changes = nextTurnData.statChanges;
         const incomeFromGrowth = Math.floor(stats.economy * (stats.economicGrowth / 100));
-        const totalMilitaryChange = Object.values(changes.military).reduce((a, b) => a + (b || 0), 0);
-        const totalChangeValue = totalMilitaryChange + incomeFromGrowth + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
-        if (totalChangeValue > 0) setTimeout(() => playSoundWithInit('stat_increase'), 200);
-        else if (totalChangeValue < 0) setTimeout(() => playSoundWithInit('stat_decrease'), 200);
 
-        const newMilitary: MilitaryStats = { ...stats.military };
-        for (const key in changes.military) {
-            const unit = key as keyof MilitaryStats;
-            newMilitary[unit] = Math.max(0, (newMilitary[unit] || 0) + (changes.military[unit] || 0));
-        }
+        const newArmyCorps = [...stats.armyCorps];
+        changes.armyCorpsChanges.forEach(change => {
+            const index = newArmyCorps.findIndex(c => c.id === change.corps.id);
+            if (change.action === 'CREATE' && index === -1) {
+                newArmyCorps.push(change.corps as ArmyCorps);
+            } else if (change.action === 'UPDATE' && index !== -1) {
+                newArmyCorps[index] = { ...newArmyCorps[index], ...change.corps };
+            } else if (change.action === 'DELETE' && index !== -1) {
+                newArmyCorps.splice(index, 1);
+            }
+        });
 
         const newWorldMap = JSON.parse(JSON.stringify(stats.worldMap)); // Deep copy
         changes.mapChanges.forEach(change => {
             if (newWorldMap[change.region]) {
                 if (change.newController) newWorldMap[change.region].controlledBy = change.newController;
-                if (typeof change.playerMilitary === 'boolean') {
-                    if (change.playerMilitary === true) {
-                        REGIONS.forEach(r => newWorldMap[r].hasPlayerMilitary = false);
-                        newWorldMap[change.region].hasPlayerMilitary = true;
-                    } else {
-                         newWorldMap[change.region].hasPlayerMilitary = false;
-                    }
-                }
                 if (change.militaryPresence) newWorldMap[change.region].militaryPresence = { ...newWorldMap[change.region].militaryPresence, ...change.militaryPresence };
                 if (typeof change.fortificationLevel === 'number') newWorldMap[change.region].fortificationLevel = change.fortificationLevel;
                 if (typeof change.isContested === 'boolean') newWorldMap[change.region].isContested = change.isContested;
@@ -340,7 +323,7 @@ const App: React.FC = () => {
 
         const newStats: GameStats = {
             ...stats,
-            military: newMilitary,
+            armyCorps: newArmyCorps,
             economy: Math.max(0, stats.economy + incomeFromGrowth + changes.economy),
             manpower: Math.max(0, stats.manpower + changes.manpower),
             morale: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.morale + changes.morale)),
@@ -350,6 +333,11 @@ const App: React.FC = () => {
             policies: [nextTurnData.policySummary, ...stats.policies],
             allianceName: nextTurnData.allianceName || stats.allianceName,
         };
+        
+        const totalMilitaryChange = calculateTotalMilitary(newStats.armyCorps).infantry - calculateTotalMilitary(stats.armyCorps).infantry; // Simplification for sound effect
+        const totalChangeValue = totalMilitaryChange + incomeFromGrowth + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
+        if (totalChangeValue > 0) setTimeout(() => playSoundWithInit('stat_increase'), 200);
+        else if (totalChangeValue < 0) setTimeout(() => playSoundWithInit('stat_decrease'), 200);
 
         setStats(newStats);
         setTurnData(nextTurnData);
@@ -368,12 +356,23 @@ const App: React.FC = () => {
         }
     }, [isLoading, stats, playerInput, eventLog, gameState, playSoundWithInit]);
 
+    const calculateTotalMilitary = (corps: ArmyCorps[]): MilitaryStats => {
+        return corps.reduce((total, currentCorps) => {
+            total.infantry += currentCorps.composition.infantry || 0;
+            total.armor += currentCorps.composition.armor || 0;
+            total.navy += currentCorps.composition.navy || 0;
+            total.airforce += currentCorps.composition.airforce || 0;
+            return total;
+        }, { infantry: 0, armor: 0, navy: 0, airforce: 0 });
+    };
+
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         handleAction();
     };
     
     const renderContent = () => {
+        const totalMilitary = calculateTotalMilitary(stats.armyCorps);
         switch (gameState) {
             case 'menu': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
@@ -428,12 +427,12 @@ const App: React.FC = () => {
                                     <StatDisplay icon="manpower" label="Nhân lực" value={formatNumber(stats.manpower)} />
                                     <StatDisplay icon="growth" label="Tăng trưởng KT" value={stats.economicGrowth.toFixed(2)} unit="%" />
                                     <div className="pt-2">
-                                        <h3 className="text-sm font-bold text-gray-400 mb-2 text-center">LỰC LƯỢNG VŨ TRANG</h3>
+                                        <h3 className="text-sm font-bold text-gray-400 mb-2 text-center">TỔNG LỰC LƯỢNG VŨ TRANG</h3>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                            <MilitaryStat icon="infantry" value={stats.military.infantry} />
-                                            <MilitaryStat icon="armor" value={stats.military.armor} />
-                                            <MilitaryStat icon="navy" value={stats.military.navy} />
-                                            <MilitaryStat icon="airforce" value={stats.military.airforce} />
+                                            <MilitaryStat icon="infantry" value={totalMilitary.infantry} />
+                                            <MilitaryStat icon="armor" value={totalMilitary.armor} />
+                                            <MilitaryStat icon="navy" value={totalMilitary.navy} />
+                                            <MilitaryStat icon="airforce" value={totalMilitary.airforce} />
                                         </div>
                                     </div>
                                     <MoraleDiplomacyBar value={stats.morale} icon="morale" label="Tinh thần" />
@@ -441,27 +440,20 @@ const App: React.FC = () => {
                                 </div>
                                 <WorldMapComponent 
                                     mapData={stats.worldMap} 
+                                    armyCorps={stats.armyCorps}
                                     onRegionSelect={setSelectedRegion} 
                                     selectedRegion={selectedRegion}
-                                    playerMilitaryStats={stats.military}
                                 />
                             </div>
                             {selectedRegion && !isLoading && (
                                 <RegionDetail 
                                     selectedRegion={selectedRegion} 
                                     mapData={stats.worldMap} 
-                                    playerStats={stats} 
+                                    playerArmyCorps={stats.armyCorps}
                                     onClose={() => setSelectedRegion(null)} 
                                 />
                             )}
-                            <div className="bg-black/30 p-4 rounded-lg border border-gray-700">
-                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-3 flex items-center justify-center gap-2"><Icon name="policy" />HỌC THUYẾT QUỐC GIA</h2>
-                                <ul className="space-y-2 text-sm text-gray-400 max-h-48 overflow-y-auto pr-2">
-                                    {stats.policies.slice(0, 10).map((policy, index) => (
-                                        <li key={index} className="bg-gray-900/50 p-2 rounded border-l-2 border-green-500">{policy}</li>
-                                    ))}
-                                </ul>
-                            </div>
+                            <ArmyCorpsManager armyCorps={stats.armyCorps} />
                         </div>
 
                         <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">

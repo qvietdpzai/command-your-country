@@ -1,11 +1,17 @@
 import React from 'react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off' | 'microphone' | 'fortification' | 'oil' | 'minerals' | 'gas' | 'close';
+    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off' | 'microphone' | 'fortification' | 'oil' | 'minerals' | 'gas' | 'close' | 'army_corps';
 }
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
     switch (name) {
+        case 'army_corps': // Shield icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            );
         case 'microphone':
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
