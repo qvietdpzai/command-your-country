@@ -1,3 +1,4 @@
+
 const { GoogleGenAI } = require("@google/genai");
 
 const apiKey = process.env.API_KEY || process.env.API_key;
@@ -129,19 +130,33 @@ const responseSchema = {
 };
 
 const handleGetNextTurn = async (currentStats, playerAction) => {
+    // This is the key change: Handle the old 'military' structure and convert it
+    // to the new 'armyCorps' structure for the AI model, ensuring backward compatibility.
+    const statsForPrompt = JSON.parse(JSON.stringify(currentStats));
+
+    if (!statsForPrompt.armyCorps && statsForPrompt.military) {
+        statsForPrompt.armyCorps = [{
+            id: 'corps-1',
+            name: 'Quân đoàn 1',
+            location: Object.keys(statsForPrompt.worldMap).find(r => statsForPrompt.worldMap[r].controlledBy === 'player') || 'north_america',
+            composition: statsForPrompt.military,
+        }];
+        delete statsForPrompt.military;
+    }
+    
     const prompt = `
         ${systemInstruction}
 
         Trạng thái hiện tại:
-        - Quốc gia: ${currentStats.nationName}
-        - Liên minh: ${currentStats.allianceName || 'Chưa có'}
-        - Kinh tế: ${currentStats.economy} Tỷ USD
-        - Nhân lực: ${currentStats.manpower}
-        - Các quân đoàn (JSON): ${JSON.stringify(currentStats.armyCorps)}
-        - Tinh thần: ${currentStats.morale}/100
-        - Ngoại giao: ${currentStats.diplomacy}/100
-        - Tăng trưởng Kinh tế: ${currentStats.economicGrowth}%
-        - Bản đồ thế giới (JSON): ${JSON.stringify(currentStats.worldMap)}
+        - Quốc gia: ${statsForPrompt.nationName}
+        - Liên minh: ${statsForPrompt.allianceName || 'Chưa có'}
+        - Kinh tế: ${statsForPrompt.economy} Tỷ USD
+        - Nhân lực: ${statsForPrompt.manpower}
+        - Các quân đoàn (JSON): ${JSON.stringify(statsForPrompt.armyCorps || [])}
+        - Tinh thần: ${statsForPrompt.morale}/100
+        - Ngoại giao: ${statsForPrompt.diplomacy}/100
+        - Tăng trưởng Kinh tế: ${statsForPrompt.economicGrowth}%
+        - Bản đồ thế giới (JSON): ${JSON.stringify(statsForPrompt.worldMap)}
 
         Hành động cuối cùng của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}
 

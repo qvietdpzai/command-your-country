@@ -1,3 +1,4 @@
+
 import { GameStats, TurnResponse } from '../types';
 import { generateEmblemSVG } from './emblemService';
 
@@ -45,7 +46,6 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
             outcome,
             scenario,
             statChanges: { 
-                // Fix: Replaced 'military: {}' with 'armyCorpsChanges: []' to align with the StatChanges type.
                 armyCorpsChanges: [],
                 economy: 0, 
                 manpower: 0,

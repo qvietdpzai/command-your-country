@@ -1,3 +1,4 @@
+
 // Factions controlling territories
 export type FactionID = 'player' | 'player_alliance' | 'eastern_alliance' | 'western_alliance' | 'neutral';
 

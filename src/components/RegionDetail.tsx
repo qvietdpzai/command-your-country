@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { RegionID, WorldMap, FactionID, StrategicResource, ArmyCorps } from '../types';
 import { Icon } from './icons';

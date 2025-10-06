@@ -1,3 +1,4 @@
+
 // Define sound types
 export type SoundName =
     | 'ui_click'
