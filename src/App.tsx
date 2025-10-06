@@ -8,6 +8,7 @@ import { NationalEmblem } from './components/NationalEmblem';
 import { soundService, SoundName } from './services/soundService';
 import { RegionDetail } from './components/RegionDetail';
 import { ArmyCorpsManager } from './components/ArmyCorpsManager';
+import { ConferenceModal } from './components/ConferenceModal';
 
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
 
@@ -123,6 +124,7 @@ const App: React.FC = () => {
     const [isMusicOn, setIsMusicOn] = useState(false);
     const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
     const [isListening, setIsListening] = useState(false);
+    const [isConferenceOpen, setIsConferenceOpen] = useState(false);
     const recognitionRef = useRef<any | null>(null);
     const audioInitialized = useRef(false);
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
@@ -458,7 +460,17 @@ const App: React.FC = () => {
                         </div>
 
                         <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">
-                            <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-2">TRUNG TÂM CHỈ HUY</h2>
+                            <div className="flex justify-between items-center border-b border-gray-600 pb-2 mb-2">
+                                <h2 className="text-xl font-bold text-gray-300">TRUNG TÂM CHỈ HUY</h2>
+                                <button
+                                    onClick={() => { playSoundWithInit('ui_click'); setIsConferenceOpen(true); }}
+                                    className="flex items-center gap-2 bg-blue-600/50 hover:bg-blue-600/80 text-white font-semibold py-1 px-3 rounded-md text-sm transition-colors"
+                                    title="Tổ chức một cuộc họp hội đồng quốc gia bằng giọng nói"
+                                >
+                                    <Icon name="conference" className="w-4 h-4" />
+                                    Họp Hội nghị
+                                </button>
+                            </div>
                             <div className="font-mono bg-black/50 p-3 rounded h-80 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
                                 <div>
                                     {eventLog.map((event, index) => (
@@ -528,6 +540,11 @@ const App: React.FC = () => {
             <footer className="absolute bottom-4 text-center text-gray-600 text-xs z-10">
                 <p>Một trải nghiệm chiến lược được cung cấp bởi Google Gemini API.</p>
             </footer>
+            <ConferenceModal 
+                isOpen={isConferenceOpen}
+                onClose={() => setIsConferenceOpen(false)}
+                gameStats={stats}
+            />
         </div>
     );
 };

@@ -2,11 +2,27 @@
 import React from 'react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off' | 'microphone' | 'fortification' | 'oil' | 'minerals' | 'gas' | 'close' | 'army_corps';
+    name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'music_on' | 'music_off' | 'microphone' | 'fortification' | 'oil' | 'minerals' | 'gas' | 'close' | 'army_corps' | 'conference' | 'speaking';
 }
 
 export const Icon: React.FC<IconProps> = ({ name, ...props }) => {
     switch (name) {
+        case 'conference': // Chat bubbles icon
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            );
+        case 'speaking': // sound wave
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+                    <path d="M2 10v4"/>
+                    <path d="M6 7v10"/>
+                    <path d="M10 4v16"/>
+                    <path d="M14 7v10"/>
+                    <path d="M18 10v4"/>
+                </svg>
+            );
         case 'army_corps': // Shield icon
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>

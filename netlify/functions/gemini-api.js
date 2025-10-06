@@ -1,7 +1,7 @@
 
 const { GoogleGenAI } = require("@google/genai");
 
-const apiKey = process.env.API_KEY || process.env.API_key;
+const apiKey = process.env.API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.
@@ -33,6 +33,8 @@ CÁC QUY TẮC KHÁC:
 -   **THẾ GIỚI SỐNG ĐỘNG:** Các quốc gia NPC có thể tương tác, gây chiến với nhau. Hãy báo cáo những sự kiện này trong 'worldStatus' và cập nhật bản đồ.
 -   Khi bắt đầu một trò chơi mới, hãy phân bổ ngẫu nhiên tài nguyên và công sự. Đặt một số quân đồn trú ban đầu cho các phe NPC. Biến Trung Đông thành khu vực tranh chấp.
 -   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.`;
+
+const systemInstructionConference = `Bạn là một hội đồng cố vấn chiến lược cho quốc gia. Người dùng là Lãnh tụ Tối cao của bạn. Hãy luôn xưng hô với họ là 'Thưa Lãnh tụ'. Giữ các câu trả lời của bạn ngắn gọn, sâu sắc và tập trung vào tình hình hiện tại của quốc gia dựa trên các số liệu thống kê được cung cấp. Đừng phá vỡ vai diễn. Câu trả lời của bạn chỉ nên chứa phần văn bản lời thoại, không có tiền tố hay định dạng nào khác.`;
 
 const responseSchema = {
     type: 'OBJECT',
@@ -197,6 +199,56 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
     }
 };
 
+const handleConferenceResponse = async (gameStats, history, userMessage) => {
+    // Build a simplified history for the prompt
+    const promptHistory = history.map(msg => `${msg.role === 'user' ? 'Lãnh tụ' : 'Hội đồng'}: ${msg.text}`).join('\n');
+
+    const prompt = `
+        ${systemInstructionConference}
+
+        Bối cảnh: Cuộc họp hội đồng quốc gia đang diễn ra.
+
+        Tóm tắt tình hình quốc gia:
+        - Quốc gia: ${gameStats.nationName}
+        - Kinh tế: ${gameStats.economy} Tỷ USD (Tăng trưởng: ${gameStats.economicGrowth}%)
+        - Nhân lực: ${gameStats.manpower}
+        - Tinh thần: ${gameStats.morale}/100
+        - Ngoại giao: ${gameStats.diplomacy}/100
+        - Các quân đoàn: ${gameStats.armyCorps.length}
+        - Tóm tắt chính sách gần đây: ${gameStats.policies[0] || 'Chưa có'}
+
+        Lịch sử cuộc họp gần đây:
+        ${promptHistory}
+
+        Lãnh tụ: ${userMessage}
+
+        Hội đồng (câu trả lời của bạn):
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                temperature: 0.7,
+                topP: 0.9,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
+        });
+        
+        if (!response || !response.text) {
+            throw new Error("AI model failed to generate a response for the conference.");
+        }
+        
+        // The response should be plain text
+        return { responseText: response.text.trim() };
+
+    } catch (apiError) {
+        console.error("Error calling Gemini API in handleConferenceResponse:", apiError);
+        throw new Error(apiError.message || "An unexpected error occurred with the AI model.");
+    }
+};
+
 const handleGenerateNationalEmblem = async (nationName) => {
     const prompt = `Quốc huy cho một quốc gia tên là '${nationName}'. Phong cách biểu tượng, mạnh mẽ, huy hiệu, dạng tròn, nghệ thuật vector, trên nền đen.`;
     const response = await ai.models.generateImages({
@@ -218,7 +270,7 @@ const handleGenerateNationalEmblem = async (nationName) => {
 
 exports.handler = async function(event, context) {
     if (!ai) {
-        const errorMessage = "Server configuration error: The API key is missing or invalid. Please check the API_KEY environment variable in Netlify settings.";
+        const errorMessage = "Server configuration error: The Google Gemini API key is missing. Please ensure the 'API_KEY' environment variable is set correctly in your Netlify deployment settings.";
         console.error(errorMessage);
         return { statusCode: 500, body: JSON.stringify({ message: errorMessage }) };
     }
@@ -238,6 +290,9 @@ exports.handler = async function(event, context) {
             const { nationName } = payload;
             const imageUrl = await handleGenerateNationalEmblem(nationName);
             responseData = { imageUrl };
+        } else if (action === 'getConferenceResponse') {
+            const { gameStats, history, userMessage } = payload;
+            responseData = await handleConferenceResponse(gameStats, history, userMessage);
         } else {
             return { statusCode: 400, body: JSON.stringify({ message: "Invalid action specified." }) };
         }
