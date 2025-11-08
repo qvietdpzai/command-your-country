@@ -89,8 +89,3 @@ export interface TurnResponse {
     damageReport: string;
     allianceName?: string;
 }
-
-export interface ChatMessage {
-    role: 'user' | 'model';
-    text: string;
-}
