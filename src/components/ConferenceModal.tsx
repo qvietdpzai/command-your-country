@@ -38,7 +38,11 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
 
         recognition.onresult = (event: any) => {
             const userMessage = event.results[0][0].transcript;
-            const currentHistory = [...history, { role: 'user', text: userMessage }];
+            // Fix: Explicitly type newUserMessage as ChatMessage.
+            // This ensures `currentHistory` has the correct type `ChatMessage[]`,
+            // resolving type errors when calling `setHistory` and `getConferenceResponse`.
+            const newUserMessage: ChatMessage = { role: 'user', text: userMessage };
+            const currentHistory = [...history, newUserMessage];
             setHistory(currentHistory);
             setIsThinking(true);
             
