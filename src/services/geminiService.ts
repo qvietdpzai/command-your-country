@@ -1,5 +1,5 @@
 
-import { GameStats, TurnResponse } from '../types';
+import { GameStats, TurnResponse, ChatMessage } from '../types';
 import { generateEmblemSVG } from './emblemService';
 
 // The endpoint for our Netlify function
@@ -73,5 +73,18 @@ export const generateNationalEmblem = async (nationName: string): Promise<string
     } catch (error) {
         console.error("Error generating national emblem via API, generating SVG fallback:", error);
         return generateEmblemSVG(nationName);
+    }
+};
+
+export const getConferenceResponse = async (gameStats: GameStats, history: ChatMessage[], userMessage: string): Promise<{ responseText: string }> => {
+    try {
+        const payload = { gameStats, history, userMessage };
+        return await callApi('getConferenceResponse', payload);
+    } catch (error) {
+        console.error("Error fetching conference response:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return {
+            responseText: `Lỗi kết nối đến hội đồng cố vấn. Vui lòng thử lại sau. (Chi tiết: ${errorMessage})`
+        };
     }
 };
