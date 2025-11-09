@@ -11,12 +11,14 @@ interface ConferenceModalProps {
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 const hasSpeechRecognition = !!SpeechRecognition;
+const hasSpeechSynthesis = 'speechSynthesis' in window;
 
 export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClose, gameStats }) => {
     const [history, setHistory] = useState<ChatMessage[]>([]);
     const [isListening, setIsListening] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
+    const [hasVietnameseVoice, setHasVietnameseVoice] = useState(true);
     const recognitionRef = useRef<any | null>(null);
     const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -37,7 +39,6 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
 
         recognition.onresult = (event: any) => {
             const userMessageText = event.results[0][0].transcript;
-            // Explicitly defining the type for newUserMessage to satisfy TypeScript's strict checking
             const newUserMessage: ChatMessage = { role: 'user', text: userMessageText };
             
             const currentHistory = [...history, newUserMessage];
@@ -46,7 +47,6 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
             
             getConferenceResponse(gameStats, currentHistory, userMessageText).then(response => {
                 const modelMessageText = response.responseText;
-                // Explicitly defining the type for newModelMessage
                 const newModelMessage: ChatMessage = { role: 'model', text: modelMessageText };
                 setHistory(prev => [...prev, newModelMessage]);
                 speak(modelMessageText);
@@ -68,21 +68,27 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
 
     // Initialize Speech Synthesis
     useEffect(() => {
+        if (!isOpen || !hasSpeechSynthesis) return;
+
         const utterance = new SpeechSynthesisUtterance();
         utterance.lang = 'vi-VN';
         
         const setVoice = () => {
             const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return; // Voices not loaded yet
+
             const vietnameseVoice = voices.find(voice => voice.lang === 'vi-VN');
             if (vietnameseVoice) {
                 utterance.voice = vietnameseVoice;
+                setHasVietnameseVoice(true);
+            } else {
+                console.warn("Không tìm thấy giọng nói tiếng Việt. Sử dụng giọng mặc định của trình duyệt.");
+                setHasVietnameseVoice(false);
             }
         };
 
         setVoice();
-        if (window.speechSynthesis.onvoiceschanged !== undefined) {
-            window.speechSynthesis.onvoiceschanged = setVoice;
-        }
+        window.speechSynthesis.addEventListener('voiceschanged', setVoice);
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
@@ -93,12 +99,14 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
         utteranceRef.current = utterance;
 
         return () => {
+            window.speechSynthesis.removeEventListener('voiceschanged', setVoice);
             window.speechSynthesis.cancel();
+            setIsSpeaking(false);
         }
-    }, []);
+    }, [isOpen]);
 
     const speak = (text: string) => {
-        if (utteranceRef.current) {
+        if (utteranceRef.current && hasSpeechSynthesis) {
             window.speechSynthesis.cancel(); // Cancel any previous speech
             utteranceRef.current.text = text;
             window.speechSynthesis.speak(utteranceRef.current);
@@ -112,7 +120,7 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
             recognitionRef.current?.stop();
         } else {
             // Cancel any speaking before listening
-            window.speechSynthesis.cancel();
+            if(hasSpeechSynthesis) window.speechSynthesis.cancel();
             setIsSpeaking(false);
             recognitionRef.current?.start();
             setIsListening(true);
@@ -120,7 +128,7 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
     };
 
     const handleClose = () => {
-        window.speechSynthesis.cancel();
+        if(hasSpeechSynthesis) window.speechSynthesis.cancel();
         recognitionRef.current?.abort();
         setHistory([]);
         onClose();
@@ -175,6 +183,7 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
                         {micButtonState.text}
                     </button>
                     {!hasSpeechRecognition && <p className="text-xs text-red-400 mt-2">Tính năng trò chuyện thoại không được trình duyệt của bạn hỗ trợ.</p>}
+                     {!hasVietnameseVoice && hasSpeechSynthesis && <p className="text-xs text-yellow-400 mt-2">Cảnh báo: Không tìm thấy giọng nói tiếng Việt trên trình duyệt. AI có thể phát âm không chính xác.</p>}
                 </div>
             </div>
         </div>
