@@ -1,7 +1,8 @@
 
 const { GoogleGenAI } = require("@google/genai");
 
-const apiKey = process.env.API_KEY;
+// Kiểm tra cả 'API_KEY' (chuẩn) và 'API_key' (lỗi phổ biến) để linh hoạt hơn.
+const apiKey = process.env.API_KEY || process.env.API_key;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.

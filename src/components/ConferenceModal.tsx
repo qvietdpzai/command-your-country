@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GameStats, ChatMessage } from '../types';
 import { getConferenceResponse } from '../services/geminiService';
@@ -38,13 +37,16 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
 
         recognition.onresult = (event: any) => {
             const userMessageText = event.results[0][0].transcript;
+            // Explicitly defining the type for newUserMessage to satisfy TypeScript's strict checking
             const newUserMessage: ChatMessage = { role: 'user', text: userMessageText };
+            
             const currentHistory = [...history, newUserMessage];
             setHistory(currentHistory);
             setIsThinking(true);
             
             getConferenceResponse(gameStats, currentHistory, userMessageText).then(response => {
                 const modelMessageText = response.responseText;
+                // Explicitly defining the type for newModelMessage
                 const newModelMessage: ChatMessage = { role: 'model', text: modelMessageText };
                 setHistory(prev => [...prev, newModelMessage]);
                 speak(modelMessageText);
@@ -123,6 +125,13 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
         setHistory([]);
         onClose();
     };
+
+    // Reset history when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setHistory([]);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
