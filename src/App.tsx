@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getNextTurn, generateNationalEmblem } from './services/geminiService';
 import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID, ArmyCorps } from './types';
@@ -47,7 +48,7 @@ const SAVE_GAME_KEY = 'ww3-savegame-v4'; // New key for army corps structure
 
 type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
-const useTypingEffect = (text: string = '', speed: number = 25): string => {
+const useTypingEffect = (text: string = '', speed: number = 15): string => {
     const [displayedText, setDisplayedText] = useState('');
     
     useEffect(() => {
