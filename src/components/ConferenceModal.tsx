@@ -37,15 +37,17 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
         recognition.interimResults = false;
 
         recognition.onresult = (event: any) => {
-            const userMessage = event.results[0][0].transcript;
-            const currentHistory = [...history, { role: 'user', text: userMessage }];
+            const userMessageText = event.results[0][0].transcript;
+            const newUserMessage: ChatMessage = { role: 'user', text: userMessageText };
+            const currentHistory = [...history, newUserMessage];
             setHistory(currentHistory);
             setIsThinking(true);
             
-            getConferenceResponse(gameStats, currentHistory, userMessage).then(response => {
-                const modelMessage = response.responseText;
-                setHistory(prev => [...prev, { role: 'model', text: modelMessage }]);
-                speak(modelMessage);
+            getConferenceResponse(gameStats, currentHistory, userMessageText).then(response => {
+                const modelMessageText = response.responseText;
+                const newModelMessage: ChatMessage = { role: 'model', text: modelMessageText };
+                setHistory(prev => [...prev, newModelMessage]);
+                speak(modelMessageText);
             }).finally(() => {
                 setIsThinking(false);
             });
