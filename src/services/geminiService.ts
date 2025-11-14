@@ -1,10 +1,10 @@
-
 import { GameStats, TurnResponse, ChatMessage } from '../types';
+import { generateEmblemSVG } from './emblemService';
 
-// The endpoint for our local Python server
-const API_ENDPOINT = 'http://localhost:8000/api';
+// The endpoint for our Netlify function
+const API_ENDPOINT = '/.netlify/functions/gemini-api';
 
-// Helper function to call our backend server
+// Helper function to call our backend function
 const callApi = async (action: string, payload: any) => {
     const response = await fetch(API_ENDPOINT, {
         method: 'POST',
@@ -17,21 +17,21 @@ const callApi = async (action: string, payload: any) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         console.error(`API Error (${action}):`, errorData);
-        throw new Error(errorData.message || `Failed to fetch from API at ${API_ENDPOINT}`);
+        throw new Error(errorData.message || 'Failed to fetch from API');
     }
 
     return response.json();
 };
 
-export const getNextTurn = async (currentStats: GameStats, playerAction: string | null, currentPlayerIndex: number): Promise<TurnResponse> => {
+export const getNextTurn = async (currentStats: GameStats, playerAction: string | null): Promise<TurnResponse> => {
     try {
-        const payload = { currentStats, playerAction, currentPlayerIndex };
+        const payload = { currentStats, playerAction };
         return await callApi('getNextTurn', payload);
     } catch (error) {
-        console.error("Error fetching next turn from Python server:", error);
+        console.error("Error fetching next turn from API function:", error);
         
         const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
-        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Hãy chắc chắn rằng máy chủ Python của bạn đang chạy và thử lại.";
+        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
 
         return {
             outcome,
@@ -52,6 +52,22 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
     }
 };
 
+export const getConferenceResponse = async (
+    currentStats: GameStats,
+    history: ChatMessage[],
+    playerAction: string
+): Promise<{ responseText: string }> => {
+    try {
+        const payload = { currentStats, history, playerAction };
+        const result = await callApi('getConferenceResponse', payload);
+        return result; // The backend should return { responseText: '...' }
+    } catch (error) {
+        console.error("Error fetching conference response from API function:", error);
+        const responseText = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
+        return { responseText };
+    }
+};
+
 export const generateNationalEmblem = async (nationName: string): Promise<string> => {
     try {
         const payload = { nationName };
@@ -59,28 +75,10 @@ export const generateNationalEmblem = async (nationName: string): Promise<string
         if (result && result.imageUrl) {
             return result.imageUrl;
         }
-        // Fallback in case the server doesn't return an image
-        console.warn("API did not return an image URL.");
-        return ''; // Return an empty string to prevent errors
+        console.warn("API did not return an image, generating SVG fallback.");
+        return generateEmblemSVG(nationName);
     } catch (error) {
-        console.error("Error generating national emblem via API:", error);
-        // Return an empty string on error
-        return '';
-    }
-};
-
-export const getConferenceResponse = async (
-    gameStats: GameStats,
-    history: ChatMessage[],
-    userMessage: string
-): Promise<{ responseText: string }> => {
-    try {
-        const payload = { gameStats, history, userMessage };
-        // This assumes a 'getConferenceResponse' action will be added to the Python server
-        const result = await callApi('getConferenceResponse', payload);
-        return result;
-    } catch (error) {
-        console.error("Error getting conference response from API function:", error);
-        return { responseText: "Xin lỗi, đã xảy ra lỗi khi kết nối với hội đồng cố vấn. Vui lòng thử lại sau." };
+        console.error("Error generating national emblem via API, generating SVG fallback:", error);
+        return generateEmblemSVG(nationName);
     }
 };

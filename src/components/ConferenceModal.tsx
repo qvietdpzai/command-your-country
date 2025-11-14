@@ -146,10 +146,10 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
     if (!isOpen) return null;
 
     const getMicButtonState = () => {
-        if (isThinking) return { text: 'AI đang suy nghĩ...', disabled: true, icon: 'load', className: 'animate-spin' };
-        if (isSpeaking) return { text: 'AI đang phát biểu...', disabled: true, icon: 'speaking', className: 'animate-pulse' };
-        if (isListening) return { text: 'Đang nghe...', disabled: false, icon: 'microphone', className: 'animate-pulse text-red-500' };
-        return { text: 'Bắt đầu nói', disabled: false, icon: 'microphone' };
+        if (isThinking) return { text: 'AI đang suy nghĩ...', disabled: true, icon: 'load' as const, className: 'animate-spin' };
+        if (isSpeaking) return { text: 'AI đang phát biểu...', disabled: true, icon: 'speaking' as const, className: 'animate-pulse' };
+        if (isListening) return { text: 'Đang nghe...', disabled: false, icon: 'microphone' as const, className: 'animate-pulse text-red-500' };
+        return { text: 'Bắt đầu nói', disabled: false, icon: 'microphone' as const };
     };
     const micButtonState = getMicButtonState();
 
@@ -178,7 +178,8 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
                         className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-full transition-transform transform hover:scale-105 flex items-center justify-center gap-3 mx-auto"
                         title={!hasSpeechRecognition ? "Trình duyệt không hỗ trợ nhận dạng giọng nói" : ""}
                     >
-                        <Icon name={micButtonState.icon as any} className={`w-6 h-6 ${micButtonState.className || ''}`} />
+                        {/* Fix: Removed 'as any' since icon names are now correctly typed */}
+                        <Icon name={micButtonState.icon} className={`w-6 h-6 ${micButtonState.className || ''}`} />
                         {micButtonState.text}
                     </button>
                     {!hasSpeechRecognition && <p className="text-xs text-red-400 mt-2">Tính năng trò chuyện thoại không được trình duyệt của bạn hỗ trợ.</p>}

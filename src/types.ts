@@ -1,10 +1,6 @@
-
 // Factions controlling territories
 export type FactionID = 
-    | 'player_1' 
-    | 'player_2' 
-    | 'player_3' 
-    | 'player_4' 
+    | 'player' 
     | 'eastern_alliance' 
     | 'western_alliance' 
     | 'neutral';
@@ -40,11 +36,10 @@ export interface ChatMessage {
 
 export interface RegionState {
     controlledBy: FactionID;
-    militaryPresence: FactionID | null; // Which player's military is here
+    hasPlayerMilitary: boolean;
     fortificationLevel: number;
     strategicResource?: StrategicResource;
     isContested: boolean;
-    militaryPresenceForces?: Partial<MilitaryStats>;
 }
 
 export type WorldMap = Record<RegionID, RegionState>;
@@ -52,7 +47,7 @@ export type WorldMap = Record<RegionID, RegionState>;
 export interface MapChange {
     region: RegionID;
     newController?: FactionID;
-    militaryPresence?: FactionID | null; // null to remove military
+    playerMilitary?: boolean; // true to place/move, false to remove, undefined to not change
 }
 
 export interface MilitaryStats {
@@ -62,8 +57,7 @@ export interface MilitaryStats {
     airforce: number;
 }
 
-export interface PlayerStats {
-    playerNumber: 1 | 2 | 3 | 4;
+export interface GameStats {
     nationName: string;
     emblemImageUrl: string | null;
     military: MilitaryStats;
@@ -72,17 +66,11 @@ export interface PlayerStats {
     morale: number; // 0-100 scale
     diplomacy: number; // 0-100 scale
     economicGrowth: number; // Percentage
+    worldMap: WorldMap;
     policies: string[];
-    isEliminated: boolean;
     armyCorps: ArmyCorps[];
 }
 
-export interface GameStats {
-    players: PlayerStats[];
-    worldMap: WorldMap;
-    currentPlayerIndex: number;
-    turnNumber: number;
-}
 
 export interface StatChanges {
     military: Partial<MilitaryStats>;

@@ -1,77 +1,65 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import ReactDOM from 'react-dom';
 import { getNextTurn, generateNationalEmblem } from './services/geminiService';
-import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID, FactionID, PlayerStats } from './types';
+import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID } from './types';
 import { Icon } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { RegionDetail } from './components/RegionDetail';
 import { ArmyCorpsManager } from './components/ArmyCorpsManager';
-import { ConferenceModal } from './components/ConferenceModal';
 import { soundService, SoundName } from './services/soundService';
 
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
 
-const createInitialMap = (playerFactions: FactionID[]): WorldMap => {
+const createInitialMap = (): WorldMap => {
     const map: Partial<WorldMap> = {};
     REGIONS.forEach(region => {
-        map[region] = { 
-            controlledBy: 'neutral', 
-            militaryPresence: null,
-            fortificationLevel: 1,
-            isContested: false,
-        };
+        map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false, fortificationLevel: 1, isContested: false };
     });
-
-    const startingRegions: RegionID[] = ['north_america', 'east_asia', 'western_europe', 'south_america'];
-    playerFactions.forEach((factionId, index) => {
-        const startRegion = startingRegions[index];
-        map[startRegion] = { 
-            controlledBy: factionId, 
-            militaryPresence: factionId,
-            fortificationLevel: 2,
-            isContested: false,
-        };
-    });
-
-    map['eastern_europe'] = { 
-        controlledBy: 'eastern_alliance', 
-        militaryPresence: null,
-        fortificationLevel: 1,
-        isContested: false,
-    };
+    // Assign starting territories
+    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true, fortificationLevel: 2, isContested: false };
+    map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false, fortificationLevel: 1, isContested: false };
+    map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, fortificationLevel: 1, isContested: false };
+    map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false, fortificationLevel: 1, isContested: false };
     // Add some strategic resources
     map['middle_east']!.strategicResource = 'oil';
     map['central_asia']!.strategicResource = 'gas';
     map['sub_saharan_africa']!.strategicResource = 'minerals';
     map['south_america']!.strategicResource = 'oil';
 
-
     return map as WorldMap;
 };
 
-const INITIAL_PLAYER_STATS: Omit<PlayerStats, 'playerNumber' | 'nationName' | 'emblemImageUrl'> = {
+const INITIAL_STATS: GameStats = { 
     military: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 },
-    economy: 2000,
+    economy: 2000, // Billions USD
     manpower: 10000000,
-    morale: 70,
+    morale: 70, 
     diplomacy: 60,
-    economicGrowth: 0.5,
-    policies: [],
-    isEliminated: false,
+    economicGrowth: 0.5, // Starting growth rate
+    worldMap: createInitialMap(), 
+    policies: [], 
+    nationName: '', 
+    emblemImageUrl: null,
     armyCorps: [],
 };
+const MAX_MORALE_DIPLOMACY = 100;
+const SAVE_GAME_KEY = 'ww3-savegame-v3';
 
-const SAVE_GAME_KEY = 'ww3-savegame-v3-hotseat';
+type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
-type GameState = 'menu' | 'player_setup' | 'naming' | 'playing' | 'turn_transition' | 'online_turn_end' | 'gameOver';
-type GameMode = 'offline' | 'online';
-
+// Custom hook for the typing animation effect
 const useTypingEffect = (text: string = '', speed: number = 25): string => {
     const [displayedText, setDisplayedText] = useState('');
+
     useEffect(() => {
-        if (!text) { setDisplayedText(''); return; }
+        soundService.init();
+    }, []);
+    
+    useEffect(() => {
+        if (!text) {
+            setDisplayedText('');
+            return;
+        }
         let i = 0;
         setDisplayedText('');
         const intervalId = setInterval(() => {
@@ -85,10 +73,16 @@ const useTypingEffect = (text: string = '', speed: number = 25): string => {
         }, speed);
         return () => clearInterval(intervalId);
     }, [text, speed]);
+
     return displayedText;
 };
 
-const formatNumber = (num: number): string => new Intl.NumberFormat('en-US').format(num);
+// Helper to format large numbers
+const formatNumber = (num: number): string => {
+    return new Intl.NumberFormat('en-US').format(num);
+};
+
+// --- New Components for Detailed Stats ---
 
 const StatDisplay: React.FC<{ icon: 'economy' | 'manpower' | 'growth'; label: string; value: string | number; unit?: string }> = ({ icon, label, value, unit }) => (
     <div className="flex items-center justify-between text-white bg-gray-900/50 p-2 rounded-md">
@@ -108,7 +102,7 @@ const MilitaryStat: React.FC<{ icon: 'infantry' | 'armor' | 'navy' | 'airforce';
 );
 
 const MoraleDiplomacyBar: React.FC<{ value: number; icon: 'morale' | 'diplomacy'; label: string }> = ({ value, icon, label }) => {
-    const percentage = (value / 100) * 100;
+    const percentage = (value / MAX_MORALE_DIPLOMACY) * 100;
     const barColor = value > 60 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500';
     return (
         <div className="flex items-center gap-3 w-full" aria-label={`${label}: ${value}`}>
@@ -121,88 +115,49 @@ const MoraleDiplomacyBar: React.FC<{ value: number; icon: 'morale' | 'diplomacy'
     );
 };
 
+// --- Main App Component ---
+
 interface SavedGameData {
     stats: GameStats;
     turnData: TurnResponse;
     eventLog: string[];
-    gameMode: GameMode;
 }
 
 const App: React.FC = () => {
-    const [stats, setStats] = useState<GameStats | null>(null);
+    const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
     const [turnData, setTurnData] = useState<TurnResponse | null>(null);
     const [eventLog, setEventLog] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [gameState, setGameState] = useState<GameState>('menu');
-    const [gameMode, setGameMode] = useState<GameMode>('offline');
     const [gameOverMessage, setGameOverMessage] = useState('');
     const [playerInput, setPlayerInput] = useState('');
-    const [playerNames, setPlayerNames] = useState<string[]>(['']);
-    const [numPlayers, setNumPlayers] = useState(2);
+    const [tempNationName, setTempNationName] = useState('');
     const [hasSaveGame, setHasSaveGame] = useState(false);
-    const [shareableLink, setShareableLink] = useState('');
-    const [linkCopied, setLinkCopied] = useState(false);
     const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
-    const [isConferenceOpen, setIsConferenceOpen] = useState(false);
-    const [isMusicOn, setIsMusicOn] = useState(false);
+
     const audioInitialized = useRef(false);
-    
-    const currentPlayerData = stats ? stats.players[stats.currentPlayerIndex] : null;
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
-
-    const serializeGameState = (gameData: Omit<SavedGameData, 'gameMode'>): string => {
-        const jsonString = JSON.stringify(gameData);
-        return btoa(unescape(encodeURIComponent(jsonString)));
-    };
-
-    const deserializeGameState = (encodedString: string): Omit<SavedGameData, 'gameMode'> | null => {
-        try {
-            const jsonString = decodeURIComponent(escape(atob(encodedString)));
-            return JSON.parse(jsonString);
-        } catch (e) {
-            console.error("Failed to deserialize game state:", e);
-            return null;
-        }
-    };
 
     useEffect(() => {
         const savedGame = localStorage.getItem(SAVE_GAME_KEY);
         setHasSaveGame(!!savedGame);
-
-        const hash = window.location.hash.slice(1);
-        if (hash) {
-            const loadedData = deserializeGameState(hash);
-            if (loadedData) {
-                setStats(loadedData.stats);
-                setTurnData(loadedData.turnData);
-                setEventLog(loadedData.eventLog);
-                setGameMode('online');
-                setGameState('playing');
-                window.history.pushState("", document.title, window.location.pathname + window.location.search);
-            }
-        }
     }, []);
 
-    useEffect(() => {
+    const initializeAudio = () => {
         if (!audioInitialized.current) {
             soundService.init();
             audioInitialized.current = true;
         }
-        if (isMusicOn && !soundService.isMusicPlaying()) {
-            soundService.playMusic();
-        } else if (!isMusicOn) {
-            soundService.stopMusic();
-        }
-    }, [isMusicOn]);
+    };
 
     const playSoundWithInit = (sound: SoundName) => {
-        if (!audioInitialized.current) soundService.init();
+        initializeAudio();
         soundService.playSound(sound);
     };
 
-    const saveGame = (currentStats: GameStats | null, currentTurnData: TurnResponse | null, currentEventLog: string[]) => {
-        if (!currentTurnData || !currentStats || gameMode !== 'offline') return;
-        const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog, gameMode: 'offline' };
+    const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse | null, currentEventLog: string[]) => {
+        if (!currentTurnData) return;
+        const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog };
         localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
         setHasSaveGame(true);
     };
@@ -218,16 +173,15 @@ const App: React.FC = () => {
         if (savedGameString) {
             try {
                 const savedGame: SavedGameData = JSON.parse(savedGameString);
-                if (savedGame.gameMode === 'offline' && savedGame.stats.players && typeof savedGame.stats.currentPlayerIndex === 'number') {
+                if (savedGame.stats.worldMap && savedGame.stats.nationName) {
                     setStats(savedGame.stats);
                     setTurnData(savedGame.turnData);
                     setEventLog(savedGame.eventLog);
-                    setGameMode('offline');
                     setGameState('playing');
                 } else {
                     clearSaveGame();
-                    alert("Dữ liệu lưu không tương thích, bắt đầu chiến dịch mới.");
-                    setGameState('menu');
+                    alert("Lỗi dữ liệu lưu, bắt đầu chiến dịch mới.");
+                    setGameState('naming');
                 }
             } catch {
                 clearSaveGame();
@@ -237,43 +191,24 @@ const App: React.FC = () => {
         }
     };
 
-    const handleGameSetup = useCallback(async () => {
-        if (playerNames.some(name => !name.trim()) || isLoading) return;
-        
+    const handleNationCreation = useCallback(async () => {
+        if (!tempNationName.trim() || isLoading) return;
         playSoundWithInit('start_game');
         clearSaveGame();
         setIsLoading(true);
         setGameState('playing');
         setEventLog([]);
         setPlayerInput('');
-
-        const playerFactions = playerNames.map((_, index) => `player_${index + 1}` as FactionID);
-
-        let initialPlayers: PlayerStats[] = playerNames.map((name, index) => ({
-            ...INITIAL_PLAYER_STATS,
-            playerNumber: (index + 1) as (1 | 2 | 3 | 4),
-            nationName: name,
-            emblemImageUrl: null
-        }));
-
-        let currentStats: GameStats = {
-            players: initialPlayers,
-            worldMap: createInitialMap(playerFactions),
-            currentPlayerIndex: 0,
-            turnNumber: 1,
-        };
+    
+        let currentStats: GameStats = { ...INITIAL_STATS, nationName: tempNationName, emblemImageUrl: null };
         setStats(currentStats);
-
-        const emblemPromises = initialPlayers.map(p => generateNationalEmblem(p.nationName));
-        const emblems = await Promise.all(emblemPromises);
-        initialPlayers.forEach((p, i) => p.emblemImageUrl = emblems[i]);
-
-        const initialTurn = await getNextTurn(currentStats, null, 0);
-
-        initialPlayers[0].policies = [initialTurn.policySummary];
-
-        currentStats = { ...currentStats, players: initialPlayers };
-
+        
+        const [emblemUrl, initialTurn] = await Promise.all([
+            generateNationalEmblem(tempNationName),
+            getNextTurn(currentStats, null)
+        ]);
+    
+        currentStats = { ...currentStats, emblemImageUrl: emblemUrl, policies: [initialTurn.policySummary] };
         setStats(currentStats);
         setTurnData(initialTurn);
         const newLog = [initialTurn.outcome];
@@ -282,338 +217,230 @@ const App: React.FC = () => {
         saveGame(currentStats, initialTurn, newLog);
         setIsLoading(false);
         playSoundWithInit('receive_response');
-    }, [playerNames, isLoading, gameMode]);
+    }, [tempNationName, isLoading]);
 
     const resetGame = () => {
         playSoundWithInit('ui_click');
         clearSaveGame();
-        setStats(null);
+        setStats(INITIAL_STATS);
         setGameState('menu');
         setTurnData(null);
         setEventLog([]);
-        setPlayerNames(['']);
+        setTempNationName('');
     }
 
     const handleAction = useCallback(async () => {
-        if (isLoading || gameState !== 'playing' || !playerInput.trim() || !stats || !currentPlayerData) return;
+        if (isLoading || gameState !== 'playing' || !playerInput.trim()) return;
 
         playSoundWithInit('send_command');
         setIsLoading(true);
         const actionToSubmit = playerInput;
-        const newEventLog = [`> [${currentPlayerData.nationName}] ${actionToSubmit}`, ...eventLog];
+        const newEventLog = [`> ${actionToSubmit}`, ...eventLog];
         setEventLog(newEventLog);
 
-        const nextTurnData = await getNextTurn(stats, actionToSubmit, stats.currentPlayerIndex);
+        const nextTurnData = await getNextTurn(stats, actionToSubmit);
         
+        playSoundWithInit('receive_response');
         setPlayerInput('');
 
         const changes = nextTurnData.statChanges;
-        const incomeFromGrowth = Math.floor(currentPlayerData.economy * (currentPlayerData.economicGrowth / 100));
 
-        const updatedPlayers = [...stats.players];
-        const playerToUpdate = { ...updatedPlayers[stats.currentPlayerIndex] };
+        const incomeFromGrowth = Math.floor(stats.economy * (stats.economicGrowth / 100));
 
-        const newMilitary: MilitaryStats = { ...playerToUpdate.military };
+        const totalMilitaryChange = Object.values(changes.military).reduce((a, b) => a + (b || 0), 0);
+        const totalChangeValue = totalMilitaryChange + incomeFromGrowth + changes.economy + changes.manpower + changes.morale + changes.diplomacy;
+        if (totalChangeValue > 0) setTimeout(() => playSoundWithInit('stat_increase'), 200);
+        else if (totalChangeValue < 0) setTimeout(() => playSoundWithInit('stat_decrease'), 200);
+
+        const newMilitary: MilitaryStats = { ...stats.military };
         for (const key in changes.military) {
             const unit = key as keyof MilitaryStats;
             newMilitary[unit] = Math.max(0, (newMilitary[unit] || 0) + (changes.military[unit] || 0));
         }
-        playerToUpdate.military = newMilitary;
-        playerToUpdate.economy = Math.max(0, playerToUpdate.economy + incomeFromGrowth + changes.economy);
-        playerToUpdate.manpower = Math.max(0, playerToUpdate.manpower + changes.manpower);
-        playerToUpdate.morale = Math.max(0, Math.min(100, playerToUpdate.morale + changes.morale));
-        playerToUpdate.diplomacy = Math.max(0, Math.min(100, playerToUpdate.diplomacy + changes.diplomacy));
-        playerToUpdate.economicGrowth = playerToUpdate.economicGrowth + changes.economicGrowth;
-        playerToUpdate.policies = [nextTurnData.policySummary, ...playerToUpdate.policies];
 
-        updatedPlayers[stats.currentPlayerIndex] = playerToUpdate;
-        
         const newWorldMap = { ...stats.worldMap };
         changes.mapChanges.forEach(change => {
             if (newWorldMap[change.region]) {
-                if (change.newController) newWorldMap[change.region].controlledBy = change.newController;
-                if (change.militaryPresence !== undefined) newWorldMap[change.region].militaryPresence = change.militaryPresence;
+                if (change.newController) {
+                    newWorldMap[change.region].controlledBy = change.newController;
+                }
+                if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === true) {
+                    REGIONS.forEach(r => newWorldMap[r].hasPlayerMilitary = false);
+                    newWorldMap[change.region].hasPlayerMilitary = true;
+                } else if (typeof change.playerMilitary === 'boolean' && change.playerMilitary === false) {
+                     newWorldMap[change.region].hasPlayerMilitary = false;
+                }
             }
         });
-        
-        const finalEventLog = [nextTurnData.outcome, ...newEventLog];
-        let newStats: GameStats = { ...stats, players: updatedPlayers, worldMap: newWorldMap };
 
-        // Determine next player index
-        let nextIndex = (newStats.currentPlayerIndex + 1) % newStats.players.length;
-        while (newStats.players[nextIndex].isEliminated) {
-            nextIndex = (nextIndex + 1) % newStats.players.length;
-        }
-        if (nextIndex === 0) newStats.turnNumber += 1;
-        newStats.currentPlayerIndex = nextIndex;
-
-        const activePlayers: PlayerStats[] = [];
-        newStats.players.forEach(p => {
-            const playerFaction: FactionID = `player_${p.playerNumber}`;
-            const hasTerritory = Object.values(newWorldMap).some(r => r.controlledBy === playerFaction);
-            if (!hasTerritory && !p.isEliminated) {
-                p.isEliminated = true;
-                finalEventLog.unshift(`[SỰ KIỆN] ${p.nationName} đã bị loại khỏi cuộc chiến!`);
-            }
-            if (!p.isEliminated) activePlayers.push(p);
-        });
+        const newStats: GameStats = {
+            ...stats,
+            military: newMilitary,
+            economy: Math.max(0, stats.economy + incomeFromGrowth + changes.economy),
+            manpower: Math.max(0, stats.manpower + changes.manpower),
+            morale: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.morale + changes.morale)),
+            diplomacy: Math.max(0, Math.min(MAX_MORALE_DIPLOMACY, stats.diplomacy + changes.diplomacy)),
+            economicGrowth: stats.economicGrowth + changes.economicGrowth,
+            worldMap: newWorldMap,
+            policies: [nextTurnData.policySummary, ...stats.policies],
+        };
 
         setStats(newStats);
         setTurnData(nextTurnData);
+        const finalEventLog = [nextTurnData.outcome, ...newEventLog];
         setEventLog(finalEventLog);
         setIsLoading(false);
-        playSoundWithInit('receive_response');
 
-        if (activePlayers.length === 1) {
-            const winner = activePlayers[0];
-            setGameOverMessage(`Tất cả các quốc gia khác đã bị đánh bại! ${winner.nationName} là người chiến thắng tuyệt đối!`);
+        const playerHasTerritory = Object.values(newStats.worldMap).some(r => r.controlledBy === 'player');
+        if (!playerHasTerritory) {
             setGameState('gameOver');
-            clearSaveGame();
-            playSoundWithInit('game_over');
-        } else if (activePlayers.length === 0) {
-            setGameOverMessage("Một kết cục nghiệt ngã, không còn quốc gia nào do người chơi kiểm soát. Thế giới chìm trong hỗn loạn.");
-            setGameState('gameOver');
+            setGameOverMessage("Bạn đã mất quyền kiểm soát tất cả các vùng lãnh thổ. Quốc gia của bạn đã bị xóa sổ khỏi bản đồ thế giới.");
             clearSaveGame();
             playSoundWithInit('game_over');
         } else {
-            if (gameMode === 'offline') {
-                setGameState('turn_transition');
-                saveGame(newStats, nextTurnData, finalEventLog);
-            } else {
-                const onlineSaveData: Omit<SavedGameData, 'gameMode'> = { stats: newStats, turnData: nextTurnData, eventLog: finalEventLog };
-                const encodedState = serializeGameState(onlineSaveData);
-                setShareableLink(`${window.location.origin}${window.location.pathname}#${encodedState}`);
-                setLinkCopied(false);
-                setGameState('online_turn_end');
-            }
+            saveGame(newStats, nextTurnData, finalEventLog);
         }
-    }, [isLoading, stats, playerInput, eventLog, gameState, currentPlayerData, gameMode]);
-
-    const handleNextTurn = () => {
-        setSelectedRegion(null);
-        setGameState('playing');
-        playSoundWithInit('ui_click');
-    };
+    }, [isLoading, stats, playerInput, eventLog, gameState]);
 
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         handleAction();
     };
-
-    const handleStartSetup = (mode: GameMode) => {
-        playSoundWithInit('ui_click');
-        setGameMode(mode);
-        setGameState('player_setup');
-    };
     
     const renderContent = () => {
-        if (!stats && (gameState === 'playing' || gameState === 'turn_transition' || gameState === 'online_turn_end' || gameState === 'gameOver')) {
-            return <div className="text-center">Lỗi trạng thái trò chơi. Đang tải lại...</div>;
-        }
-        
         switch (gameState) {
             case 'menu': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
                     <h1 className="text-5xl font-bold bg-gradient-to-r from-red-500 to-yellow-400 text-transparent bg-clip-text mb-4 animate-fade-in">WW3: Xung đột toàn cầu</h1>
-                    <p className="text-gray-400 mb-8 max-w-lg animate-fade-in" style={{ animationDelay: '0.3s' }}>Lãnh đạo quốc gia của bạn trong cuộc xung đột toàn cầu. Chơi một mình, cạnh tranh với bạn bè trên cùng một thiết bị, hoặc online theo lượt.</p>
+                    <p className="text-gray-400 mb-8 max-w-sm animate-fade-in" style={{ animationDelay: '0.3s' }}>Bạn là nhà lãnh đạo tối cao. Mỗi quyết định đều có thể dẫn đến chiến thắng hoặc thất bại.</p>
                     <div className="flex flex-col sm:flex-row gap-4 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                        <button onClick={() => handleStartSetup('offline')} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
-                           Chế độ Offline (Ghế Nóng)
-                        </button>
-                        <button onClick={() => handleStartSetup('online')} className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
-                           Chế độ Online (Chia sẻ Lượt)
+                        {hasSaveGame && (
+                            <button onClick={loadGame} className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
+                                <Icon name="load" className="w-6 h-6"/> Tiếp tục chiến dịch
+                            </button>
+                        )}
+                        <button onClick={() => { playSoundWithInit('ui_click'); setGameState('naming'); }} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
+                            <Icon name="play" className="w-6 h-6"/> {hasSaveGame ? 'Chiến dịch mới' : 'Bắt đầu chiến dịch'}
                         </button>
                     </div>
-                     {hasSaveGame && <button onClick={loadGame} className="mt-6 flex items-center gap-3 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105 animate-fade-in" style={{ animationDelay: '0.7s' }}><Icon name="load"/> Tiếp tục Chiến dịch Offline</button>}
                 </div>
             );
             
-            case 'player_setup': return (
-                <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                    <h2 className="text-3xl font-bold text-gray-200 mb-4 animate-slide-in-up">Thiết lập Trận đấu ({gameMode === 'offline' ? 'Offline' : 'Online'})</h2>
-                    <label className="text-gray-400 mb-4">Số lượng người chơi:</label>
-                    <select value={numPlayers} onChange={e => {
-                        const count = parseInt(e.target.value);
-                        setNumPlayers(count);
-                        setPlayerNames(Array(count).fill(''));
-                    }} className="bg-gray-900 border-2 border-gray-600 rounded-lg p-2 mb-8 text-white">
-                        <option value={2}>2</option>
-                        <option value={3}>3</option>
-                        <option value={4}>4</option>
-                    </select>
-                    <button onClick={() => { playSoundWithInit('ui_click'); setGameState('naming'); }} className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
-                        Tiếp tục
-                    </button>
-                </div>
-            );
-
             case 'naming': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                    <h2 className="text-3xl font-bold text-gray-200 mb-4">Đặt tên cho các Quốc gia</h2>
-                    <form onSubmit={(e) => { e.preventDefault(); handleGameSetup(); }} className="w-full max-w-sm flex flex-col gap-4">
-                        {playerNames.map((name, index) => (
-                            <input key={index} type="text" value={name} onChange={(e) => {
-                                const newNames = [...playerNames];
-                                newNames[index] = e.target.value;
-                                setPlayerNames(newNames);
-                            }} placeholder={`Tên quốc gia của Người chơi ${index + 1}`} className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center text-xl" autoFocus={index === 0} />
-                        ))}
-                        <button type="submit" disabled={playerNames.some(name => !name.trim()) || isLoading} className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
-                             {isLoading ? 'Đang tạo thế giới...' : 'Bắt đầu'}
+                    <h2 className="text-3xl font-bold text-gray-200 mb-4 animate-slide-in-up">Đặt tên cho quốc gia của bạn</h2>
+                    <p className="text-gray-400 mb-8 max-w-md animate-slide-in-up" style={{ animationDelay: '0.3s' }}>Tên quốc gia sẽ định hình vận mệnh và biểu tượng của dân tộc bạn.</p>
+                    <form onSubmit={(e) => { e.preventDefault(); handleNationCreation(); }} className="w-full max-w-sm flex flex-col gap-4 animate-slide-in-up" style={{ animationDelay: '0.5s' }}>
+                        <input type="text" value={tempNationName} onChange={(e) => setTempNationName(e.target.value)} placeholder="Ví dụ: Cộng hòa Astoria" className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center text-xl" autoFocus />
+                        <button type="submit" disabled={!tempNationName.trim()} className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <Icon name="play" className="w-6 h-6"/> Bắt đầu
                         </button>
                     </form>
                  </div>
             );
 
-            case 'turn_transition':
-                if (!stats) return null;
-                const nextPlayer = stats.players[stats.currentPlayerIndex];
-                return (
-                     <div className="text-center flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
-                        <h2 className="text-3xl font-bold text-gray-200 mb-4">Lượt đi kết thúc</h2>
-                        <p className="text-gray-400 mb-8 max-w-md">Chuyển thiết bị cho <span className="text-yellow-400 font-bold">{nextPlayer.nationName}</span>.</p>
-                        <button onClick={handleNextTurn} className="flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
-                            Bắt đầu lượt
-                        </button>
-                    </div>
-                );
-
-            case 'online_turn_end':
-                if (!stats) return null;
-                const nextOnlinePlayer = stats.players[stats.currentPlayerIndex];
-                return (
-                    <div className="text-center flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
-                        <h2 className="text-3xl font-bold text-gray-200 mb-4">Lượt của bạn đã kết thúc</h2>
-                        <p className="text-gray-400 mb-6 max-w-md">Sao chép liên kết bên dưới và gửi cho <span className="text-yellow-400 font-bold">{nextOnlinePlayer.nationName}</span> để họ thực hiện lượt đi của mình.</p>
-                        <div className="w-full max-w-lg mb-4">
-                            <input type="text" readOnly value={shareableLink} className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-3 text-white text-sm font-mono" />
-                        </div>
-                        <button onClick={() => {
-                            navigator.clipboard.writeText(shareableLink);
-                            setLinkCopied(true);
-                            setTimeout(() => setLinkCopied(false), 2000);
-                        }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors">
-                            {linkCopied ? 'Đã sao chép!' : 'Sao chép Liên kết'}
-                        </button>
-                         <button onClick={resetGame} className="mt-8 text-gray-500 hover:text-gray-300 text-sm">
-                            Thoát về Menu Chính
-                        </button>
-                    </div>
-                );
-
             case 'gameOver': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
                     <h2 className="text-3xl font-bold text-red-500 mb-4 animate-fade-in">TRÒ CHƠI KẾT THÚC</h2>
                     <p className="text-gray-300 mb-8 max-w-md animate-fade-in" style={{ animationDelay: '0.3s' }}>{gameOverMessage}</p>
-                    <button onClick={resetGame} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 animate-fade-in" style={{ animationDelay: '0.5s' }}><Icon name="refresh"/> Chơi lại</button>
+                    <button onClick={resetGame} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+                        <Icon name="refresh" className="w-5 h-5"/> Chơi lại
+                    </button>
                 </div>
             );
             
             case 'playing':
-                if (!stats || !currentPlayerData) return null;
                 const isTyping = animatedScenario.length < (turnData?.scenario || '').length;
                 return (
-                    <>
-                        {ReactDOM.createPortal(
-                            <ConferenceModal 
-                                isOpen={isConferenceOpen} 
-                                onClose={() => setIsConferenceOpen(false)} 
-                                gameStats={stats} 
-                            />,
-                            document.getElementById('modal-root')!
-                        )}
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in">
-                            <div className="lg:col-span-2 flex flex-col gap-6">
-                                <div className="bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
-                                    <NationalEmblem nationName={currentPlayerData.nationName} imageUrl={currentPlayerData.emblemImageUrl} isLoading={isLoading && !currentPlayerData.emblemImageUrl} />
-                                    <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 -mt-2">TRẠNG THÁI QUỐC GIA</h2>
-                                    <div className="space-y-3">
-                                        <StatDisplay icon="economy" label="Kinh tế" value={formatNumber(currentPlayerData.economy)} unit="Tỷ USD" />
-                                        <StatDisplay icon="manpower" label="Nhân lực" value={formatNumber(currentPlayerData.manpower)} />
-                                        <StatDisplay icon="growth" label="Tăng trưởng KT" value={currentPlayerData.economicGrowth.toFixed(2)} unit="%" />
-                                        <div className="pt-2">
-                                            <h3 className="text-sm font-bold text-gray-400 mb-2 text-center">LỰC LƯỢNG VŨ TRANG</h3>
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                                <MilitaryStat icon="infantry" value={currentPlayerData.military.infantry} />
-                                                <MilitaryStat icon="armor" value={currentPlayerData.military.armor} />
-                                                <MilitaryStat icon="navy" value={currentPlayerData.military.navy} />
-                                                <MilitaryStat icon="airforce" value={currentPlayerData.military.airforce} />
-                                            </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in">
+                        <div className="lg:col-span-2 flex flex-col gap-6">
+                            <div className="bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
+                                <NationalEmblem nationName={stats.nationName} imageUrl={stats.emblemImageUrl} isLoading={isLoading && !stats.emblemImageUrl} />
+                                <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 -mt-2">TRẠNG THÁI QUỐC GIA</h2>
+                                <div className="space-y-3">
+                                    <StatDisplay icon="economy" label="Kinh tế" value={formatNumber(stats.economy)} unit="Tỷ USD" />
+                                    <StatDisplay icon="manpower" label="Nhân lực" value={formatNumber(stats.manpower)} />
+                                    <StatDisplay icon="growth" label="Tăng trưởng KT" value={stats.economicGrowth.toFixed(2)} unit="%" />
+                                    <div className="pt-2">
+                                        <h3 className="text-sm font-bold text-gray-400 mb-2 text-center">LỰC LƯỢNG VŨ TRANG</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <MilitaryStat icon="infantry" value={stats.military.infantry} />
+                                            <MilitaryStat icon="armor" value={stats.military.armor} />
+                                            <MilitaryStat icon="navy" value={stats.military.navy} />
+                                            <MilitaryStat icon="airforce" value={stats.military.airforce} />
                                         </div>
-                                        <MoraleDiplomacyBar value={currentPlayerData.morale} icon="morale" label="Tinh thần" />
-                                        <MoraleDiplomacyBar value={currentPlayerData.diplomacy} icon="diplomacy" label="Ngoại giao" />
                                     </div>
-                                    <WorldMapComponent mapData={stats.worldMap} onRegionClick={setSelectedRegion} />
+                                    <MoraleDiplomacyBar value={stats.morale} icon="morale" label="Tinh thần" />
+                                    <MoraleDiplomacyBar value={stats.diplomacy} icon="diplomacy" label="Ngoại giao" />
                                 </div>
-                                {selectedRegion ? (
-                                    <RegionDetail 
-                                        selectedRegion={selectedRegion} 
-                                        mapData={stats.worldMap} 
-                                        playerArmyCorps={currentPlayerData.armyCorps} 
-                                        onClose={() => setSelectedRegion(null)} 
-                                    />
-                                ) : (
-                                    <>
-                                        <ArmyCorpsManager armyCorps={currentPlayerData.armyCorps} />
-                                        <div className="bg-black/30 p-4 rounded-lg border border-gray-700">
-                                            <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-3 flex items-center justify-center gap-2"><Icon name="policy" />HỌC THUYẾT QUỐC GIA</h2>
-                                            <ul className="space-y-2 text-sm text-gray-400 max-h-48 overflow-y-auto pr-2">
-                                                {currentPlayerData.policies.slice(0, 10).map((policy, index) => (
-                                                    <li key={index} className="bg-gray-900/50 p-2 rounded border-l-2 border-green-500">{policy}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </>
-                                )}
+                                <WorldMapComponent mapData={stats.worldMap} onRegionClick={setSelectedRegion} />
                             </div>
 
-                            <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">
-                                <div className="flex justify-between items-center border-b border-gray-600 pb-2 mb-2">
-                                    <h2 className="text-xl font-bold text-center text-gray-300">TRUNG TÂM CHỈ HUY - Lượt {stats.turnNumber}</h2>
-                                    <button onClick={() => setIsConferenceOpen(true)} className="text-gray-400 hover:text-white flex items-center gap-2 bg-blue-900/50 hover:bg-blue-800/70 px-3 py-1 rounded-md text-sm" title="Hội nghị với Cố vấn AI">
-                                        <Icon name="conference" className="w-4 h-4" /> Hội nghị
-                                    </button>
-                                </div>
-                                <div className="font-mono bg-black/50 p-3 rounded h-40 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
-                                    <div>
-                                        {eventLog.map((event, index) => (
-                                            <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : event.startsWith('[SỰ KIỆN]') ? 'text-yellow-400 font-bold' : 'text-gray-300'}>{event}</p>
-                                        ))}
+                            {selectedRegion ? (
+                                <RegionDetail 
+                                    selectedRegion={selectedRegion} 
+                                    mapData={stats.worldMap} 
+                                    playerArmyCorps={stats.armyCorps} 
+                                    onClose={() => setSelectedRegion(null)} 
+                                />
+                            ) : (
+                                <>
+                                    <ArmyCorpsManager armyCorps={stats.armyCorps} />
+                                    <div className="bg-black/30 p-4 rounded-lg border border-gray-700">
+                                        <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-3 flex items-center justify-center gap-2"><Icon name="policy" />HỌC THUYẾT QUỐC GIA</h2>
+                                        <ul className="space-y-2 text-sm text-gray-400 max-h-48 overflow-y-auto pr-2">
+                                            {stats.policies.slice(0, 10).map((policy, index) => (
+                                                <li key={index} className="bg-gray-900/50 p-2 rounded border-l-2 border-green-500">{policy}</li>
+                                            ))}
+                                        </ul>
                                     </div>
-                                </div>
-                                
-                                {isLoading ? ( 
-                                    <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
-                                        <svg className="animate-spin h-8 w-8 text-white mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Đang xử lý diễn biến...
-                                    </div>
-                                ) : (
-                                    <div className="flex-grow flex flex-col">
-                                        <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4 animate-slide-in-up">
-                                            <h3 className="font-bold text-yellow-400 text-sm mb-1 flex items-center gap-2"><Icon name="warning" className="w-4 h-4"/>BÁO CÁO THIỆT HẠI</h3>
-                                            <p className="text-gray-300 text-sm">{turnData?.damageReport}</p>
-                                        </div>
-                                        <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-4 animate-slide-in-up" style={{ animationDelay: '0.1s' }}>
-                                            <h3 className="font-bold text-gray-400 text-sm mb-1">TÌNH BÁO TOÀN CẦU</h3>
-                                            <p className="text-gray-300 text-sm">{turnData?.worldStatus}</p>
-                                        </div>
-                                        <p className="text-green-300 mb-4 text-lg flex-grow min-h-[4.5rem] animate-slide-in-up" style={{ animationDelay: '0.2s' }}>
-                                            {animatedScenario}
-                                            {isTyping && <span className="typing-cursor">_</span>}
-                                        </p>
-                                        <form onSubmit={handleFormSubmit} className="mt-auto animate-fade-in" style={{ animationDelay: '0.3s' }}>
-                                            <label htmlFor="player-action" className="sr-only">Hành động của bạn</label>
-                                            <div className="flex items-center gap-2 bg-black/50 border rounded-lg p-2 form-input-glow">
-                                                <span className="font-mono text-cyan-400 pl-2">{'>'}</span>
-                                                <input id="player-action" type="text" value={playerInput} onChange={(e) => setPlayerInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAction(); } }} placeholder={`Mệnh lệnh cho ${currentPlayerData.nationName}...`} className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500" disabled={isLoading} autoFocus />
-                                                <button type="submit" disabled={isLoading || !playerInput.trim()} className="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed self-end"><Icon name="send" className="w-5 h-5"/></button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                )}
-                            </div>
+                                </>
+                            )}
                         </div>
-                    </>
+
+                        <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">
+                            <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-2">TRUNG TÂM CHỈ HUY</h2>
+                            <div className="font-mono bg-black/50 p-3 rounded h-40 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
+                                <div>
+                                    {eventLog.map((event, index) => (
+                                        <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : event.startsWith('Lỗi') ? 'text-yellow-400' : 'text-gray-300'}>{event}</p>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {isLoading ? (
+                                <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
+                                    <svg className="animate-spin h-8 w-8 text-white mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    Đang xử lý diễn biến...
+                                </div>
+                            ) : (
+                                <div className="flex-grow flex flex-col">
+                                    <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4 animate-slide-in-up">
+                                        <h3 className="font-bold text-yellow-400 text-sm mb-1 flex items-center gap-2"><Icon name="warning" className="w-4 h-4" />BÁO CÁO THIỆT HẠI</h3>
+                                        <p className="text-gray-300 text-sm">{turnData?.damageReport}</p>
+                                    </div>
+                                    <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-4 animate-slide-in-up" style={{ animationDelay: '0.1s' }}>
+                                        <h3 className="font-bold text-gray-400 text-sm mb-1">TÌNH BÁO TOÀN CẦU</h3>
+                                        <p className="text-gray-300 text-sm">{turnData?.worldStatus}</p>
+                                    </div>
+                                    <p className="text-green-300 mb-4 text-lg flex-grow min-h-[4.5rem] animate-slide-in-up" style={{ animationDelay: '0.2s' }}>
+                                        {animatedScenario}
+                                        {isTyping && <span className="typing-cursor">_</span>}
+                                    </p>
+                                    <form onSubmit={handleFormSubmit} className="mt-auto animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                                        <label htmlFor="player-action" className="sr-only">Hành động của bạn</label>
+                                        <div className="flex items-center gap-2 bg-black/50 border rounded-lg p-2 form-input-glow">
+                                            <span className="font-mono text-cyan-400 pl-2">{'>'}</span>
+                                            <input id="player-action" type="text" value={playerInput} onChange={(e) => setPlayerInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAction(); } }} placeholder="Nhập mệnh lệnh của bạn ở đây..." className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-gray-500" disabled={isLoading} autoFocus />
+                                            <button type="submit" disabled={isLoading || !playerInput.trim()} className="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed self-end" aria-label="Gửi mệnh lệnh">
+                                                <Icon name="send" className="w-5 h-5"/>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )
         }
     }
@@ -622,15 +449,6 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 selection:bg-green-500 selection:text-black relative overflow-hidden scanline-overlay">
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-gray-900 via-gray-900 to-black z-0 opacity-80"></div>
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/black-felt.png')] opacity-10 z-0"></div>
-            
-            <button
-                className="music-toggle"
-                onClick={() => setIsMusicOn(!isMusicOn)}
-                aria-label={isMusicOn ? 'Tắt nhạc' : 'Bật nhạc'}
-            >
-                <Icon name={isMusicOn ? 'music_on' : 'music_off'} className="w-6 h-6" />
-            </button>
-
             <main className="w-full max-w-7xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700 glow-border">
                 {renderContent()}
             </main>

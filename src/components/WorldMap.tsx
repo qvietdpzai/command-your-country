@@ -1,26 +1,15 @@
-
 import React from 'react';
 import { WorldMap as WorldMapData, RegionID, FactionID } from '../types';
 
-const PLAYER_COLORS = ['fill-blue-500/80 stroke-blue-300', 'fill-purple-500/80 stroke-purple-300', 'fill-yellow-500/80 stroke-yellow-300', 'fill-pink-500/80 stroke-pink-300'];
-const PLAYER_STAR_COLORS = ['fill-blue-300', 'fill-purple-300', 'fill-yellow-300', 'fill-pink-300'];
-
-
 const FACTION_COLORS: Record<FactionID, string> = {
-    player_1: PLAYER_COLORS[0],
-    player_2: PLAYER_COLORS[1],
-    player_3: PLAYER_COLORS[2],
-    player_4: PLAYER_COLORS[3],
+    player: 'fill-blue-500/80 stroke-blue-300',
     eastern_alliance: 'fill-red-500/80 stroke-red-300',
     western_alliance: 'fill-green-500/80 stroke-green-300',
     neutral: 'fill-gray-600/70 stroke-gray-400',
 };
 
 const FACTION_NAMES: Record<FactionID, string> = {
-    player_1: 'Người chơi 1',
-    player_2: 'Người chơi 2',
-    player_3: 'Người chơi 3',
-    player_4: 'Người chơi 4',
+    player: 'Quốc gia của bạn',
     eastern_alliance: 'Liên minh Phương Đông',
     western_alliance: 'Liên minh Phương Tây',
     neutral: 'Trung lập'
@@ -54,13 +43,7 @@ interface WorldMapProps {
 }
 
 export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) => {
-    const playerMilitaryRegions: {region: RegionID, color: string}[] = [];
-    Object.entries(mapData).forEach(([region, state]) => {
-        if (state.militaryPresence?.startsWith('player_')) {
-            const playerNum = parseInt(state.militaryPresence.split('_')[1]) - 1;
-            playerMilitaryRegions.push({ region: region as RegionID, color: PLAYER_STAR_COLORS[playerNum] });
-        }
-    });
+    const playerMilitaryRegion = Object.keys(mapData).find(key => mapData[key as RegionID].hasPlayerMilitary) as RegionID | undefined;
 
     return (
         <div className="mt-4 flex flex-col items-center">
@@ -94,25 +77,22 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) =>
                             </g>
                         );
                     })}
-                    {playerMilitaryRegions.map(({ region, color }, index) => (
-                        <g key={index} transform={`translate(${REGION_DATA[region].center[0]}, ${REGION_DATA[region].center[1]})`} className="pointer-events-none">
+                    {playerMilitaryRegion && (
+                        <g transform={`translate(${REGION_DATA[playerMilitaryRegion].center[0]}, ${REGION_DATA[playerMilitaryRegion].center[1]})`} className="pointer-events-none">
                              <path d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z" 
-                                className={`${color} stroke-black`} 
+                                className="fill-yellow-300 stroke-black" 
                                 strokeWidth="0.5"
                                 style={{ filter: 'url(#glow)' }}
                             />
-                             <title>Sự hiện diện quân sự</title>
+                             <title>Sự hiện diện quân sự của bạn</title>
                         </g>
-                    ))}
+                    )}
                 </svg>
             </div>
             <div className="w-full mt-2 px-2">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">CHÚ GIẢI BẢN ĐỒ</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1">
-                    <LegendItem colorClass={FACTION_COLORS.player_1} name={"Người chơi 1"} />
-                    <LegendItem colorClass={FACTION_COLORS.player_2} name={"Người chơi 2"} />
-                    <LegendItem colorClass={FACTION_COLORS.player_3} name={"Người chơi 3"} />
-                    <LegendItem colorClass={FACTION_COLORS.player_4} name={"Người chơi 4"} />
+                    <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
                     <LegendItem colorClass={FACTION_COLORS.western_alliance} name={FACTION_NAMES.western_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.eastern_alliance} name={FACTION_NAMES.eastern_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.neutral} name={FACTION_NAMES.neutral} />
