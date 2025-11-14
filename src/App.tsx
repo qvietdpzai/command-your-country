@@ -11,7 +11,6 @@ const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe',
 
 const createInitialMap = (playerFactions: FactionID[]): WorldMap => {
     const map: Partial<WorldMap> = {};
-    // Fix: Initialize new RegionState properties
     REGIONS.forEach(region => {
         map[region] = { 
             controlledBy: 'neutral', 
@@ -24,7 +23,6 @@ const createInitialMap = (playerFactions: FactionID[]): WorldMap => {
     const startingRegions: RegionID[] = ['north_america', 'east_asia', 'western_europe', 'south_america'];
     playerFactions.forEach((factionId, index) => {
         const startRegion = startingRegions[index];
-        // Fix: Initialize new RegionState properties for starting regions
         map[startRegion] = { 
             controlledBy: factionId, 
             militaryPresence: factionId,
@@ -33,7 +31,6 @@ const createInitialMap = (playerFactions: FactionID[]): WorldMap => {
         };
     });
 
-    // Fix: Initialize new RegionState properties
     map['eastern_europe'] = { 
         controlledBy: 'eastern_alliance', 
         militaryPresence: null,
@@ -52,13 +49,13 @@ const INITIAL_PLAYER_STATS: Omit<PlayerStats, 'playerNumber' | 'nationName' | 'e
     economicGrowth: 0.5,
     policies: [],
     isEliminated: false,
-    // Fix: Initialize new PlayerStats property
     armyCorps: [],
 };
 
 const SAVE_GAME_KEY = 'ww3-savegame-v3-hotseat';
 
-type GameState = 'menu' | 'player_setup' | 'naming' | 'playing' | 'turn_transition' | 'gameOver';
+type GameState = 'menu' | 'player_setup' | 'naming' | 'playing' | 'turn_transition' | 'online_turn_end' | 'gameOver';
+type GameMode = 'offline' | 'online';
 
 const useTypingEffect = (text: string = '', speed: number = 25): string => {
     const [displayedText, setDisplayedText] = useState('');
@@ -120,27 +117,62 @@ interface SavedGameData {
     stats: GameStats;
     turnData: TurnResponse;
     eventLog: string[];
+    gameMode: GameMode;
 }
-// Fix: Corrected component definition (though the error was caused by bad JSX later)
+
 const App: React.FC = () => {
     const [stats, setStats] = useState<GameStats | null>(null);
     const [turnData, setTurnData] = useState<TurnResponse | null>(null);
     const [eventLog, setEventLog] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [gameState, setGameState] = useState<GameState>('menu');
+    const [gameMode, setGameMode] = useState<GameMode>('offline');
     const [gameOverMessage, setGameOverMessage] = useState('');
     const [playerInput, setPlayerInput] = useState('');
     const [playerNames, setPlayerNames] = useState<string[]>(['']);
     const [numPlayers, setNumPlayers] = useState(2);
     const [hasSaveGame, setHasSaveGame] = useState(false);
+    const [shareableLink, setShareableLink] = useState('');
+    const [linkCopied, setLinkCopied] = useState(false);
     const audioInitialized = useRef(false);
     
     const currentPlayerData = stats ? stats.players[stats.currentPlayerIndex] : null;
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
 
+    // --- Game State Serialization ---
+    const serializeGameState = (gameData: Omit<SavedGameData, 'gameMode'>): string => {
+        const jsonString = JSON.stringify(gameData);
+        return btoa(jsonString); // Base64 encode
+    };
+
+    const deserializeGameState = (encodedString: string): Omit<SavedGameData, 'gameMode'> | null => {
+        try {
+            const jsonString = atob(encodedString); // Base64 decode
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error("Failed to deserialize game state:", e);
+            return null;
+        }
+    };
+
     useEffect(() => {
         const savedGame = localStorage.getItem(SAVE_GAME_KEY);
         setHasSaveGame(!!savedGame);
+
+        // Check for online game state in URL hash
+        const hash = window.location.hash.slice(1);
+        if (hash) {
+            const loadedData = deserializeGameState(hash);
+            if (loadedData) {
+                setStats(loadedData.stats);
+                setTurnData(loadedData.turnData);
+                setEventLog(loadedData.eventLog);
+                setGameMode('online');
+                setGameState('playing');
+                // Clear the hash
+                window.history.pushState("", document.title, window.location.pathname + window.location.search);
+            }
+        }
     }, []);
 
     const initializeAudio = () => {
@@ -156,8 +188,8 @@ const App: React.FC = () => {
     };
 
     const saveGame = (currentStats: GameStats | null, currentTurnData: TurnResponse | null, currentEventLog: string[]) => {
-        if (!currentTurnData || !currentStats) return;
-        const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog };
+        if (!currentTurnData || !currentStats || gameMode !== 'offline') return;
+        const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog, gameMode: 'offline' };
         localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
         setHasSaveGame(true);
     };
@@ -173,10 +205,11 @@ const App: React.FC = () => {
         if (savedGameString) {
             try {
                 const savedGame: SavedGameData = JSON.parse(savedGameString);
-                if (savedGame.stats.players && typeof savedGame.stats.currentPlayerIndex === 'number') {
+                if (savedGame.gameMode === 'offline' && savedGame.stats.players && typeof savedGame.stats.currentPlayerIndex === 'number') {
                     setStats(savedGame.stats);
                     setTurnData(savedGame.turnData);
                     setEventLog(savedGame.eventLog);
+                    setGameMode('offline');
                     setGameState('playing');
                 } else {
                     clearSaveGame();
@@ -236,7 +269,7 @@ const App: React.FC = () => {
         saveGame(currentStats, initialTurn, newLog);
         setIsLoading(false);
         playSoundWithInit('receive_response');
-    }, [playerNames, isLoading]);
+    }, [playerNames, isLoading, gameMode]);
 
     const resetGame = () => {
         playSoundWithInit('ui_click');
@@ -290,20 +323,26 @@ const App: React.FC = () => {
             }
         });
         
-        let newStats: GameStats = { ...stats, players: updatedPlayers, worldMap: newWorldMap };
         const finalEventLog = [nextTurnData.outcome, ...newEventLog];
+        let newStats: GameStats = { ...stats, players: updatedPlayers, worldMap: newWorldMap };
 
-        // Check for eliminated players
+        // Determine next player index
+        let nextIndex = (newStats.currentPlayerIndex + 1) % newStats.players.length;
+        while (newStats.players[nextIndex].isEliminated) {
+            nextIndex = (nextIndex + 1) % newStats.players.length;
+        }
+        if (nextIndex === 0) newStats.turnNumber += 1;
+        newStats.currentPlayerIndex = nextIndex;
+
+        // Check for eliminated players & win condition
         const activePlayers: PlayerStats[] = [];
-        let winner: PlayerStats | null = null;
         newStats.players.forEach(p => {
             const hasTerritory = Object.values(newWorldMap).some(r => r.controlledBy === `player_${p.playerNumber}`);
-            if (!hasTerritory) {
+            if (!hasTerritory && !p.isEliminated) {
                 p.isEliminated = true;
+                finalEventLog.unshift(`[SỰ KIỆN] ${p.nationName} đã bị loại khỏi cuộc chiến!`);
             }
-            if (!p.isEliminated) {
-                activePlayers.push(p);
-            }
+            if (!p.isEliminated) activePlayers.push(p);
         });
 
         setStats(newStats);
@@ -312,9 +351,8 @@ const App: React.FC = () => {
         setIsLoading(false);
         playSoundWithInit('receive_response');
 
-        // Fix: Corrected game over and save logic
         if (activePlayers.length === 1) {
-            winner = activePlayers[0];
+            const winner = activePlayers[0];
             setGameOverMessage(`Tất cả các quốc gia khác đã bị đánh bại! ${winner.nationName} là người chiến thắng tuyệt đối!`);
             setGameState('gameOver');
             clearSaveGame();
@@ -325,25 +363,20 @@ const App: React.FC = () => {
             clearSaveGame();
             playSoundWithInit('game_over');
         } else {
-             setGameState('turn_transition');
-             saveGame(newStats, nextTurnData, finalEventLog);
+            if (gameMode === 'offline') {
+                setGameState('turn_transition');
+                saveGame(newStats, nextTurnData, finalEventLog);
+            } else { // Online mode
+                const onlineSaveData: Omit<SavedGameData, 'gameMode'> = { stats: newStats, turnData: nextTurnData, eventLog: finalEventLog };
+                const encodedState = serializeGameState(onlineSaveData);
+                setShareableLink(`${window.location.origin}${window.location.pathname}#${encodedState}`);
+                setLinkCopied(false);
+                setGameState('online_turn_end');
+            }
         }
-
-    }, [isLoading, stats, playerInput, eventLog, gameState, currentPlayerData]);
+    }, [isLoading, stats, playerInput, eventLog, gameState, currentPlayerData, gameMode]);
 
     const handleNextTurn = () => {
-        if (!stats) return;
-        let nextIndex = (stats.currentPlayerIndex + 1) % stats.players.length;
-        // Skip eliminated players
-        while (stats.players[nextIndex].isEliminated) {
-            nextIndex = (nextIndex + 1) % stats.players.length;
-        }
-
-        const newStats = { ...stats, currentPlayerIndex: nextIndex };
-        if (nextIndex === 0) {
-            newStats.turnNumber += 1;
-        }
-        setStats(newStats);
         setGameState('playing');
         playSoundWithInit('ui_click');
     };
@@ -352,10 +385,15 @@ const App: React.FC = () => {
         e.preventDefault();
         handleAction();
     };
+
+    const handleStartSetup = (mode: GameMode) => {
+        playSoundWithInit('ui_click');
+        setGameMode(mode);
+        setGameState('player_setup');
+    };
     
     const renderContent = () => {
-        if (!stats && (gameState === 'playing' || gameState === 'turn_transition' || gameState === 'gameOver')) {
-            // Failsafe for invalid state
+        if (!stats && (gameState === 'playing' || gameState === 'turn_transition' || gameState === 'online_turn_end' || gameState === 'gameOver')) {
             return <div className="text-center">Lỗi trạng thái trò chơi. Đang tải lại...</div>;
         }
         
@@ -363,17 +401,22 @@ const App: React.FC = () => {
             case 'menu': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
                     <h1 className="text-5xl font-bold bg-gradient-to-r from-red-500 to-yellow-400 text-transparent bg-clip-text mb-4 animate-fade-in">WW3: Xung đột toàn cầu</h1>
-                    <p className="text-gray-400 mb-8 max-w-sm animate-fade-in" style={{ animationDelay: '0.3s' }}>Bạn là nhà lãnh đạo tối cao. Mỗi quyết định đều có thể dẫn đến chiến thắng hoặc thất bại.</p>
+                    <p className="text-gray-400 mb-8 max-w-lg animate-fade-in" style={{ animationDelay: '0.3s' }}>Lãnh đạo quốc gia của bạn trong cuộc xung đột toàn cầu. Chơi một mình, cạnh tranh với bạn bè trên cùng một thiết bị, hoặc online theo lượt.</p>
                     <div className="flex flex-col sm:flex-row gap-4 animate-fade-in" style={{ animationDelay: '0.5s' }}>
-                        {hasSaveGame && <button onClick={loadGame} className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"><Icon name="load"/> Tiếp tục chiến dịch</button>}
-                        <button onClick={() => { playSoundWithInit('ui_click'); setGameState('player_setup'); }} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105"><Icon name="play"/> {hasSaveGame ? 'Chiến dịch mới' : 'Bắt đầu chiến dịch'}</button>
+                        <button onClick={() => handleStartSetup('offline')} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
+                           Chế độ Offline (Ghế Nóng)
+                        </button>
+                        <button onClick={() => handleStartSetup('online')} className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
+                           Chế độ Online (Chia sẻ Lượt)
+                        </button>
                     </div>
+                     {hasSaveGame && <button onClick={loadGame} className="mt-6 flex items-center gap-3 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105 animate-fade-in" style={{ animationDelay: '0.7s' }}><Icon name="load"/> Tiếp tục Chiến dịch Offline</button>}
                 </div>
             );
             
             case 'player_setup': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                    <h2 className="text-3xl font-bold text-gray-200 mb-4 animate-slide-in-up">Thiết lập Trận đấu</h2>
+                    <h2 className="text-3xl font-bold text-gray-200 mb-4 animate-slide-in-up">Thiết lập Trận đấu ({gameMode === 'offline' ? 'Offline' : 'Online'})</h2>
                     <label className="text-gray-400 mb-4">Số lượng người chơi:</label>
                     <select value={numPlayers} onChange={e => {
                         const count = parseInt(e.target.value);
@@ -409,15 +452,37 @@ const App: React.FC = () => {
             );
 
             case 'turn_transition':
-                const nextPlayerIndex = (stats!.currentPlayerIndex + 1) % stats!.players.length;
-                const nextPlayer = stats!.players.find((_, i) => i === nextPlayerIndex && !stats!.players[i].isEliminated) || stats!.players.find(p => !p.isEliminated);
-                
+                if (!stats) return null;
+                const nextPlayer = stats.players[stats.currentPlayerIndex];
                 return (
                      <div className="text-center flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
                         <h2 className="text-3xl font-bold text-gray-200 mb-4">Lượt đi kết thúc</h2>
-                        <p className="text-gray-400 mb-8 max-w-md">Chuyển thiết bị cho <span className="text-yellow-400 font-bold">{nextPlayer!.nationName}</span>.</p>
+                        <p className="text-gray-400 mb-8 max-w-md">Chuyển thiết bị cho <span className="text-yellow-400 font-bold">{nextPlayer.nationName}</span>.</p>
                         <button onClick={handleNextTurn} className="flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
                             Bắt đầu lượt
+                        </button>
+                    </div>
+                );
+
+            case 'online_turn_end':
+                if (!stats) return null;
+                const nextOnlinePlayer = stats.players[stats.currentPlayerIndex];
+                return (
+                    <div className="text-center flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
+                        <h2 className="text-3xl font-bold text-gray-200 mb-4">Lượt của bạn đã kết thúc</h2>
+                        <p className="text-gray-400 mb-6 max-w-md">Sao chép liên kết bên dưới và gửi cho <span className="text-yellow-400 font-bold">{nextOnlinePlayer.nationName}</span> để họ thực hiện lượt đi của mình.</p>
+                        <div className="w-full max-w-lg mb-4">
+                            <input type="text" readOnly value={shareableLink} className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-3 text-white text-sm font-mono" />
+                        </div>
+                        <button onClick={() => {
+                            navigator.clipboard.writeText(shareableLink);
+                            setLinkCopied(true);
+                            setTimeout(() => setLinkCopied(false), 2000);
+                        }} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors">
+                            {linkCopied ? 'Đã sao chép!' : 'Sao chép Liên kết'}
+                        </button>
+                         <button onClick={resetGame} className="mt-8 text-gray-500 hover:text-gray-300 text-sm">
+                            Thoát về Menu Chính
                         </button>
                     </div>
                 );
@@ -461,16 +526,14 @@ const App: React.FC = () => {
 
                         <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">
                             <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-2">TRUNG TÂM CHỈ HUY - Lượt {stats.turnNumber}</h2>
-                            {/* Fix: Restored event log JSX */}
                             <div className="font-mono bg-black/50 p-3 rounded h-40 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
                                 <div>
                                     {eventLog.map((event, index) => (
-                                        <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : event.startsWith('Lỗi') ? 'text-yellow-400' : 'text-gray-300'}>{event}</p>
+                                        <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : event.startsWith('[SỰ KIỆN]') ? 'text-yellow-400 font-bold' : 'text-gray-300'}>{event}</p>
                                     ))}
                                 </div>
                             </div>
                             
-                            {/* Fix: Restored loading state JSX */}
                             {isLoading ? ( 
                                 <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
                                     <svg className="animate-spin h-8 w-8 text-white mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -478,7 +541,6 @@ const App: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="flex-grow flex flex-col">
-                                    {/* Fix: Restored report sections JSX */}
                                     <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4 animate-slide-in-up">
                                         <h3 className="font-bold text-yellow-400 text-sm mb-1 flex items-center gap-2"><Icon name="warning" className="w-4 h-4"/>BÁO CÁO THIỆT HẠI</h3>
                                         <p className="text-gray-300 text-sm">{turnData?.damageReport}</p>
