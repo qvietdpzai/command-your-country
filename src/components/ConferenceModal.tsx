@@ -76,7 +76,7 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
         
         const setVoice = () => {
             const voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) return; // Voices not loaded yet
+            if (voices.length === 0) return; 
 
             const vietnameseVoice = voices.find(voice => voice.lang === 'vi-VN');
             if (vietnameseVoice) {
@@ -88,8 +88,11 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
             }
         };
 
-        setVoice();
-        window.speechSynthesis.addEventListener('voiceschanged', setVoice);
+        if (window.speechSynthesis.getVoices().length === 0) {
+            window.speechSynthesis.addEventListener('voiceschanged', setVoice);
+        } else {
+            setVoice();
+        }
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
@@ -108,7 +111,7 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
 
     const speak = (text: string) => {
         if (utteranceRef.current && hasSpeechSynthesis) {
-            window.speechSynthesis.cancel(); // Cancel any previous speech
+            window.speechSynthesis.cancel(); 
             utteranceRef.current.text = text;
             window.speechSynthesis.speak(utteranceRef.current);
         }
@@ -120,7 +123,6 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
         if (isListening) {
             recognitionRef.current?.stop();
         } else {
-            // Cancel any speaking before listening
             if(hasSpeechSynthesis) window.speechSynthesis.cancel();
             setIsSpeaking(false);
             recognitionRef.current?.start();
@@ -135,10 +137,9 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
         onClose();
     };
 
-    // Reset history when modal opens
     useEffect(() => {
         if (isOpen) {
-            setHistory([]);
+            setHistory([{role: 'model', text: 'Chào mừng Tổng tư lệnh. Hội đồng cố vấn sẵn sàng lắng nghe và đưa ra ý kiến về tình hình hiện tại. Xin hãy cho biết chúng tôi có thể giúp gì cho ngài?'}]);
         }
     }, [isOpen]);
 
@@ -161,11 +162,8 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
                 </div>
                 
                 <div className="flex-grow bg-black/30 rounded p-4 overflow-y-auto mb-4 font-mono text-lg">
-                    {history.length === 0 && (
-                        <div className="text-gray-500 h-full flex items-center justify-center">Bắt đầu cuộc họp bằng cách nhấn nút micro bên dưới.</div>
-                    )}
                     {history.map((msg, index) => (
-                        <div key={index} className={`mb-4 animate-fade-in ${msg.role === 'user' ? 'text-cyan-400' : 'text-green-300'}`}>
+                        <div key={index} className={`mb-4 animate-slide-in-up ${msg.role === 'user' ? 'text-cyan-400' : 'text-green-300'}`} style={{animationDelay: `${index * 100}ms`}}>
                             <span className="font-bold">{msg.role === 'user' ? 'Bạn' : 'Hội đồng'}: </span>
                             <span>{msg.text}</span>
                         </div>

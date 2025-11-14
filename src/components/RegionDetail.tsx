@@ -12,7 +12,6 @@ const ForceStat: React.FC<{ icon: 'infantry' | 'armor' | 'navy' | 'airforce'; va
     </div>
 );
 
-// Fix: Corrected faction names to match multiplayer FactionID type
 const FACTION_NAMES: Record<FactionID, string> = {
     player_1: 'Người chơi 1',
     player_2: 'Người chơi 2',
@@ -59,7 +58,6 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
     const controllingFaction = regionState.controlledBy;
     
     const playerCorpsInRegion = playerArmyCorps.filter(corps => corps.location === selectedRegion);
-    // Fix: Use the new `militaryPresenceForces` field for defender information
     const defenderForces = regionState.militaryPresenceForces || {};
 
     const hasDefenderForces = Object.values(defenderForces).some(val => typeof val === 'number' && val > 0);

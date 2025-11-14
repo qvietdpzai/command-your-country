@@ -1,11 +1,10 @@
 
 import { GameStats, TurnResponse, ChatMessage } from '../types';
-import { generateEmblemSVG } from './emblemService';
 
-// The endpoint for our Netlify function
-const API_ENDPOINT = '/.netlify/functions/gemini-api';
+// The endpoint for our local Python server
+const API_ENDPOINT = 'http://localhost:8000/api';
 
-// Helper function to call our backend function
+// Helper function to call our backend server
 const callApi = async (action: string, payload: any) => {
     const response = await fetch(API_ENDPOINT, {
         method: 'POST',
@@ -18,7 +17,7 @@ const callApi = async (action: string, payload: any) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         console.error(`API Error (${action}):`, errorData);
-        throw new Error(errorData.message || 'Failed to fetch from API');
+        throw new Error(errorData.message || `Failed to fetch from API at ${API_ENDPOINT}`);
     }
 
     return response.json();
@@ -29,10 +28,10 @@ export const getNextTurn = async (currentStats: GameStats, playerAction: string 
         const payload = { currentStats, playerAction, currentPlayerIndex };
         return await callApi('getNextTurn', payload);
     } catch (error) {
-        console.error("Error fetching next turn from API function:", error);
+        console.error("Error fetching next turn from Python server:", error);
         
         const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
-        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
+        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Hãy chắc chắn rằng máy chủ Python của bạn đang chạy và thử lại.";
 
         return {
             outcome,
@@ -60,15 +59,16 @@ export const generateNationalEmblem = async (nationName: string): Promise<string
         if (result && result.imageUrl) {
             return result.imageUrl;
         }
-        console.warn("API did not return an image, generating SVG fallback.");
-        return generateEmblemSVG(nationName);
+        // Fallback in case the server doesn't return an image
+        console.warn("API did not return an image URL.");
+        return ''; // Return an empty string to prevent errors
     } catch (error) {
-        console.error("Error generating national emblem via API, generating SVG fallback:", error);
-        return generateEmblemSVG(nationName);
+        console.error("Error generating national emblem via API:", error);
+        // Return an empty string on error
+        return '';
     }
 };
 
-// Fix: Add missing getConferenceResponse function for ConferenceModal
 export const getConferenceResponse = async (
     gameStats: GameStats,
     history: ChatMessage[],
@@ -76,7 +76,7 @@ export const getConferenceResponse = async (
 ): Promise<{ responseText: string }> => {
     try {
         const payload = { gameStats, history, userMessage };
-        // This assumes a 'getConferenceResponse' action exists on the backend
+        // This assumes a 'getConferenceResponse' action will be added to the Python server
         const result = await callApi('getConferenceResponse', payload);
         return result;
     } catch (error) {

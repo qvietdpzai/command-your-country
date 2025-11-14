@@ -48,7 +48,12 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
     </div>
 );
 
-export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
+interface WorldMapProps {
+    mapData: WorldMapData;
+    onRegionClick: (region: RegionID) => void;
+}
+
+export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) => {
     const playerMilitaryRegions: {region: RegionID, color: string}[] = [];
     Object.entries(mapData).forEach(([region, state]) => {
         if (state.militaryPresence?.startsWith('player_')) {
@@ -74,12 +79,15 @@ export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
                     {Object.keys(REGION_DATA).map(key => {
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
-                        const faction = mapData[regionId]?.controlledBy || 'neutral';
+                        const regionState = mapData[regionId];
+                        const faction = regionState?.controlledBy || 'neutral';
+                        const isContested = regionState?.isContested;
+
                         return (
-                            <g key={regionId} className="group">
+                            <g key={regionId} className="group cursor-pointer" onClick={() => onRegionClick(regionId)}>
                                 <path
                                     d={region.path}
-                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white`}
+                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white ${isContested ? 'contested-zone' : ''}`}
                                     strokeWidth="1.5"
                                 />
                                 <title>{`${region.name} - Kiểm soát bởi: ${FACTION_NAMES[faction]}`}</title>

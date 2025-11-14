@@ -24,10 +24,8 @@ export type RegionID =
     | 'southeast_asia' 
     | 'oceania';
 
-// Fix: Add StrategicResource type for RegionDetail component
 export type StrategicResource = 'oil' | 'minerals' | 'gas';
 
-// Fix: Add ArmyCorps interface for RegionDetail and ArmyCorpsManager components
 export interface ArmyCorps {
     id: string;
     name: string;
@@ -35,7 +33,6 @@ export interface ArmyCorps {
     composition: Partial<MilitaryStats>;
 }
 
-// Fix: Add ChatMessage interface for ConferenceModal component
 export interface ChatMessage {
     role: 'user' | 'model';
     text: string;
@@ -44,7 +41,6 @@ export interface ChatMessage {
 export interface RegionState {
     controlledBy: FactionID;
     militaryPresence: FactionID | null; // Which player's military is here
-    // Fix: Add missing properties for RegionDetail component
     fortificationLevel: number;
     strategicResource?: StrategicResource;
     isContested: boolean;
@@ -78,7 +74,6 @@ export interface PlayerStats {
     economicGrowth: number; // Percentage
     policies: string[];
     isEliminated: boolean;
-    // Fix: Add armyCorps for ArmyCorpsManager component
     armyCorps: ArmyCorps[];
 }
 
