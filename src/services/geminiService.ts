@@ -18,35 +18,27 @@ const callApi = async (action: string, payload: any) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         console.error(`API Error (${action}):`, errorData);
-        const errorMessage = errorData.details ? `${errorData.message} (${errorData.details})` : errorData.message || 'Failed to fetch from API';
-        throw new Error(errorMessage);
+        throw new Error(errorData.message || 'Failed to fetch from API');
     }
 
     return response.json();
 };
 
-export const getNextTurn = async (currentStats: GameStats, playerAction: string | null): Promise<TurnResponse> => {
+export const getNextTurn = async (currentStats: GameStats, playerAction: string | null, currentPlayerIndex: number): Promise<TurnResponse> => {
     try {
-        const payload = { currentStats, playerAction };
+        const payload = { currentStats, playerAction, currentPlayerIndex };
         return await callApi('getNextTurn', payload);
     } catch (error) {
         console.error("Error fetching next turn from API function:", error);
         
-        let errorMessage = error instanceof Error ? error.message : "Lỗi kết nối máy chủ không xác định";
-        let outcome = `Lỗi: ${errorMessage}`;
-        let scenario = `Không thể kết nối đến máy chủ điều khiển trò chơi. Đã xảy ra lỗi khi xử lý mệnh lệnh của bạn. Vui lòng thử lại. (Chi tiết: ${errorMessage})`;
-
-        // Check for specific quota/rate limit error from Gemini API
-        if (errorMessage.includes('429') && (errorMessage.includes('quota') || errorMessage.includes('RESOURCE_EXHAUSTED'))) {
-             outcome = "Lỗi: Đã đạt đến giới hạn yêu cầu API";
-             scenario = "Bạn đã vượt quá hạn ngạch yêu cầu API miễn phí cho ngày hôm nay. Máy chủ chỉ huy tạm thời không thể xử lý mệnh lệnh mới. Vui lòng thử lại sau khi hạn ngạch của bạn được làm mới (thường là sau 24 giờ).";
-        }
+        const outcome = error instanceof Error ? `Lỗi: ${error.message}` : "Lỗi kết nối máy chủ";
+        const scenario = "Không thể kết nối đến máy chủ điều khiển trò chơi. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình máy chủ và thử lại.";
 
         return {
             outcome,
             scenario,
             statChanges: { 
-                armyCorpsChanges: [],
+                military: {}, 
                 economy: 0, 
                 manpower: 0,
                 morale: 0, 
@@ -76,15 +68,19 @@ export const generateNationalEmblem = async (nationName: string): Promise<string
     }
 };
 
-export const getConferenceResponse = async (gameStats: GameStats, history: ChatMessage[], userMessage: string): Promise<{ responseText: string }> => {
+// Fix: Add missing getConferenceResponse function for ConferenceModal
+export const getConferenceResponse = async (
+    gameStats: GameStats,
+    history: ChatMessage[],
+    userMessage: string
+): Promise<{ responseText: string }> => {
     try {
         const payload = { gameStats, history, userMessage };
-        return await callApi('getConferenceResponse', payload);
+        // This assumes a 'getConferenceResponse' action exists on the backend
+        const result = await callApi('getConferenceResponse', payload);
+        return result;
     } catch (error) {
-        console.error("Error fetching conference response:", error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
-        return {
-            responseText: `Lỗi kết nối đến hội đồng cố vấn. Vui lòng thử lại sau. (Chi tiết: ${errorMessage})`
-        };
+        console.error("Error getting conference response from API function:", error);
+        return { responseText: "Xin lỗi, đã xảy ra lỗi khi kết nối với hội đồng cố vấn. Vui lòng thử lại sau." };
     }
 };

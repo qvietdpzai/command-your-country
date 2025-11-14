@@ -1,6 +1,13 @@
 
 // Factions controlling territories
-export type FactionID = 'player' | 'player_alliance' | 'eastern_alliance' | 'western_alliance' | 'neutral';
+export type FactionID = 
+    | 'player_1' 
+    | 'player_2' 
+    | 'player_3' 
+    | 'player_4' 
+    | 'eastern_alliance' 
+    | 'western_alliance' 
+    | 'neutral';
 
 // Definable regions on the world map
 export type RegionID = 
@@ -17,7 +24,40 @@ export type RegionID =
     | 'southeast_asia' 
     | 'oceania';
 
+// Fix: Add StrategicResource type for RegionDetail component
 export type StrategicResource = 'oil' | 'minerals' | 'gas';
+
+// Fix: Add ArmyCorps interface for RegionDetail and ArmyCorpsManager components
+export interface ArmyCorps {
+    id: string;
+    name: string;
+    location: RegionID;
+    composition: Partial<MilitaryStats>;
+}
+
+// Fix: Add ChatMessage interface for ConferenceModal component
+export interface ChatMessage {
+    role: 'user' | 'model';
+    text: string;
+}
+
+export interface RegionState {
+    controlledBy: FactionID;
+    militaryPresence: FactionID | null; // Which player's military is here
+    // Fix: Add missing properties for RegionDetail component
+    fortificationLevel: number;
+    strategicResource?: StrategicResource;
+    isContested: boolean;
+    militaryPresenceForces?: Partial<MilitaryStats>;
+}
+
+export type WorldMap = Record<RegionID, RegionState>;
+
+export interface MapChange {
+    region: RegionID;
+    newController?: FactionID;
+    militaryPresence?: FactionID | null; // null to remove military
+}
 
 export interface MilitaryStats {
     infantry: number;
@@ -26,52 +66,31 @@ export interface MilitaryStats {
     airforce: number;
 }
 
-export interface ArmyCorps {
-    id: string;
-    name: string;
-    location: RegionID;
-    composition: MilitaryStats;
-}
-
-export interface RegionState {
-    controlledBy: FactionID;
-    militaryPresence?: Partial<MilitaryStats>; // Troops stationed in the region
-    fortificationLevel: number; // e.g., 1-5
-    strategicResource?: StrategicResource | null;
-    isContested: boolean;
-}
-
-export type WorldMap = Record<RegionID, RegionState>;
-
-export interface MapChange {
-    region: RegionID;
-    newController?: FactionID;
-    militaryPresence?: Partial<MilitaryStats>; // New troop numbers in the region after events
-    fortificationLevel?: number;
-    isContested?: boolean;
-}
-
-export interface ArmyCorpsChange {
-    action: 'CREATE' | 'UPDATE' | 'DELETE';
-    corps: Partial<ArmyCorps> & { id: string }; // For DELETE, only id is needed. For UPDATE, id and changed fields. For CREATE, full object.
-}
-
-export interface GameStats {
-    armyCorps: ArmyCorps[];
+export interface PlayerStats {
+    playerNumber: 1 | 2 | 3 | 4;
+    nationName: string;
+    emblemImageUrl: string | null;
+    military: MilitaryStats;
     economy: number; // In billions USD
     manpower: number; // Total available personnel
     morale: number; // 0-100 scale
     diplomacy: number; // 0-100 scale
     economicGrowth: number; // Percentage
-    worldMap: WorldMap; 
     policies: string[];
-    nationName: string;
-    emblemImageUrl: string | null;
-    allianceName?: string;
+    isEliminated: boolean;
+    // Fix: Add armyCorps for ArmyCorpsManager component
+    armyCorps: ArmyCorps[];
+}
+
+export interface GameStats {
+    players: PlayerStats[];
+    worldMap: WorldMap;
+    currentPlayerIndex: number;
+    turnNumber: number;
 }
 
 export interface StatChanges {
-    armyCorpsChanges: ArmyCorpsChange[];
+    military: Partial<MilitaryStats>;
     economy: number;
     manpower: number;
     morale: number;
@@ -87,10 +106,4 @@ export interface TurnResponse {
     policySummary: string;
     worldStatus: string;
     damageReport: string;
-    allianceName?: string;
-}
-
-export interface ChatMessage {
-    role: 'user' | 'model';
-    text: string;
 }

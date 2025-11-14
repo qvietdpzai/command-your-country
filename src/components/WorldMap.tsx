@@ -1,28 +1,29 @@
 
 import React from 'react';
-import { WorldMap as WorldMapData, RegionID, FactionID, StrategicResource, ArmyCorps } from '../types';
-import { Icon } from './icons';
+import { WorldMap as WorldMapData, RegionID, FactionID } from '../types';
+
+const PLAYER_COLORS = ['fill-blue-500/80 stroke-blue-300', 'fill-purple-500/80 stroke-purple-300', 'fill-yellow-500/80 stroke-yellow-300', 'fill-pink-500/80 stroke-pink-300'];
+const PLAYER_STAR_COLORS = ['fill-blue-300', 'fill-purple-300', 'fill-yellow-300', 'fill-pink-300'];
+
 
 const FACTION_COLORS: Record<FactionID, string> = {
-    player: 'fill-blue-500/80 stroke-blue-300',
-    player_alliance: 'fill-purple-500/80 stroke-purple-300',
+    player_1: PLAYER_COLORS[0],
+    player_2: PLAYER_COLORS[1],
+    player_3: PLAYER_COLORS[2],
+    player_4: PLAYER_COLORS[3],
     eastern_alliance: 'fill-red-500/80 stroke-red-300',
     western_alliance: 'fill-green-500/80 stroke-green-300',
     neutral: 'fill-gray-600/70 stroke-gray-400',
 };
 
 const FACTION_NAMES: Record<FactionID, string> = {
-    player: 'Quốc gia của bạn',
-    player_alliance: 'Liên minh của bạn',
+    player_1: 'Người chơi 1',
+    player_2: 'Người chơi 2',
+    player_3: 'Người chơi 3',
+    player_4: 'Người chơi 4',
     eastern_alliance: 'Liên minh Phương Đông',
     western_alliance: 'Liên minh Phương Tây',
     neutral: 'Trung lập'
-};
-
-const RESOURCE_ICONS: Record<StrategicResource, 'oil' | 'minerals' | 'gas'> = {
-    oil: 'oil',
-    minerals: 'minerals',
-    gas: 'gas'
 };
 
 const REGION_DATA: Record<RegionID, { path: string, center: [number, number], name: string }> = {
@@ -47,23 +48,21 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
     </div>
 );
 
-interface WorldMapProps {
-    mapData: WorldMapData;
-    armyCorps: ArmyCorps[];
-    onRegionSelect: (regionId: RegionID) => void;
-    selectedRegion: RegionID | null;
-}
+export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
+    const playerMilitaryRegions: {region: RegionID, color: string}[] = [];
+    Object.entries(mapData).forEach(([region, state]) => {
+        if (state.militaryPresence?.startsWith('player_')) {
+            const playerNum = parseInt(state.militaryPresence.split('_')[1]) - 1;
+            playerMilitaryRegions.push({ region: region as RegionID, color: PLAYER_STAR_COLORS[playerNum] });
+        }
+    });
 
-export const WorldMap: React.FC<WorldMapProps> = ({ mapData, armyCorps, onRegionSelect, selectedRegion }) => {
     return (
         <div className="mt-4 flex flex-col items-center">
             <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢC TOÀN CẦU</h3>
             <div className="bg-gray-900/50 p-2 rounded-md w-full">
-                <svg viewBox="0 0 560 210" className="w-full h-auto" style={{ fontSize: '10px' }}>
+                <svg viewBox="0 0 560 210" className="w-full h-auto">
                     <defs>
-                        <pattern id="land-texture" patternUnits="userSpaceOnUse" width="4" height="4">
-                           <path d="M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2" strokeWidth="0.5" stroke="rgba(0,0,0,0.2)" />
-                        </pattern>
                         <filter id="glow">
                             <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
                             <feMerge>
@@ -72,69 +71,40 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, armyCorps, onRegion
                             </feMerge>
                         </filter>
                     </defs>
-
-                    <rect x="0" y="0" width="560" height="210" fill="#1a202c" />
-
                     {Object.keys(REGION_DATA).map(key => {
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
-                        const regionState = mapData[regionId];
-                        if (!regionState) return null;
-
-                        const faction = regionState.controlledBy;
-                        const isSelected = selectedRegion === regionId;
-                        
-                        const title = `${region.name} - ${FACTION_NAMES[faction]}\nCông sự: ${regionState.fortificationLevel}/5${regionState.strategicResource ? `\nTài nguyên: ${regionState.strategicResource}` : ''}${regionState.isContested ? '\nTình trạng: Đang tranh chấp' : ''}`;
-
+                        const faction = mapData[regionId]?.controlledBy || 'neutral';
                         return (
-                            <g key={regionId} className="group cursor-pointer" onClick={() => onRegionSelect(regionId)}>
+                            <g key={regionId} className="group">
                                 <path
                                     d={region.path}
-                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white ${isSelected ? 'stroke-yellow-300' : ''}`}
-                                    strokeWidth={isSelected ? 2.5 : 1.5}
+                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white`}
+                                    strokeWidth="1.5"
                                 />
-                                <path d={region.path} fill="url(#land-texture)" className="pointer-events-none" opacity="0.5" />
-
-                                {regionState.isContested && <path d={region.path} className="fill-none contested-zone pointer-events-none" />}
-                                
-                                <g transform={`translate(${region.center[0]}, ${region.center[1]})`} className="pointer-events-none">
-                                    {regionState.fortificationLevel > 1 && (
-                                        <g transform="translate(-20, 8)">
-                                            <title>{`Cấp độ công sự: ${regionState.fortificationLevel}`}</title>
-                                            <Icon name="fortification" className="w-4 h-4 text-gray-200" stroke="black" strokeWidth={1}/>
-                                            <text x="5" y="4" textAnchor="middle" className="fill-white font-bold" stroke='black' strokeWidth="0.2" style={{ fontSize: '10px' }}>{regionState.fortificationLevel}</text>
-                                        </g>
-                                    )}
-                                    {regionState.strategicResource && (
-                                        <g transform="translate(12, 8)">
-                                            <title>{`Tài nguyên: ${regionState.strategicResource}`}</title>
-                                            <Icon name={RESOURCE_ICONS[regionState.strategicResource]} className="w-4 h-4 text-yellow-300" stroke="black" strokeWidth={1} />
-                                        </g>
-                                    )}
-                                </g>
-                                <title>{title}</title>
+                                <title>{`${region.name} - Kiểm soát bởi: ${FACTION_NAMES[faction]}`}</title>
                             </g>
                         );
                     })}
-
-                    {armyCorps.map((corps, index) => {
-                         const regionCenter = REGION_DATA[corps.location].center;
-                         // Offset icons if multiple corps are in the same region
-                         const offset = armyCorps.filter(c => c.location === corps.location).length > 1 ? (index % 4) * 12 - 18 : 0;
-                        return (
-                             <g key={corps.id} transform={`translate(${regionCenter[0] + offset}, ${regionCenter[1] - 8})`} className="pointer-events-none">
-                                <Icon name="armor" className="w-5 h-5 fill-yellow-300 stroke-black" strokeWidth="1" style={{ filter: 'url(#glow)' }} />
-                                <title>{`Quân đoàn: ${corps.name}`}</title>
-                            </g>
-                        )
-                    })}
+                    {playerMilitaryRegions.map(({ region, color }, index) => (
+                        <g key={index} transform={`translate(${REGION_DATA[region].center[0]}, ${REGION_DATA[region].center[1]})`} className="pointer-events-none">
+                             <path d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z" 
+                                className={`${color} stroke-black`} 
+                                strokeWidth="0.5"
+                                style={{ filter: 'url(#glow)' }}
+                            />
+                             <title>Sự hiện diện quân sự</title>
+                        </g>
+                    ))}
                 </svg>
             </div>
             <div className="w-full mt-2 px-2">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">CHÚ GIẢI BẢN ĐỒ</h4>
-                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-                    <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
-                    <LegendItem colorClass={FACTION_COLORS.player_alliance} name={FACTION_NAMES.player_alliance} />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1">
+                    <LegendItem colorClass={FACTION_COLORS.player_1} name={"Người chơi 1"} />
+                    <LegendItem colorClass={FACTION_COLORS.player_2} name={"Người chơi 2"} />
+                    <LegendItem colorClass={FACTION_COLORS.player_3} name={"Người chơi 3"} />
+                    <LegendItem colorClass={FACTION_COLORS.player_4} name={"Người chơi 4"} />
                     <LegendItem colorClass={FACTION_COLORS.western_alliance} name={FACTION_NAMES.western_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.eastern_alliance} name={FACTION_NAMES.eastern_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.neutral} name={FACTION_NAMES.neutral} />
