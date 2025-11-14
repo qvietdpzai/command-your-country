@@ -443,6 +443,19 @@ const App: React.FC = () => {
                             <MoraleDiplomacyBar value={stats.diplomacy} icon="diplomacy" label="Ngoại giao" />
                         </div>
                         <WorldMapComponent mapData={isMultiplayer ? mpStats.worldMap : (stats as SinglePlayerGameStats).worldMap} onRegionClick={setSelectedRegion} players={players} singlePlayerMilitaryRegion={singlePlayerMilitaryRegion}/>
+                        
+                        <div className="mt-4">
+                            {selectedRegion ? (
+                                <RegionDetail
+                                    selectedRegion={selectedRegion}
+                                    mapData={isMultiplayer ? mpStats.worldMap : (stats as SinglePlayerGameStats).worldMap}
+                                    playerArmyCorps={stats.armyCorps || []}
+                                    onClose={() => setSelectedRegion(null)}
+                                />
+                            ) : (
+                                <ArmyCorpsManager armyCorps={stats.armyCorps || []} />
+                            )}
+                        </div>
                     </div>
                 </div>
 
