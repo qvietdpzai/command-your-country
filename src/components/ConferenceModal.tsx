@@ -1,13 +1,15 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
-import { GameStats, ChatMessage } from '../types';
+// Fix: Replaced GameStats with SinglePlayerGameStats as GameStats is no longer exported from types.
+import { SinglePlayerGameStats, ChatMessage } from '../types';
 import { getConferenceResponse } from '../services/geminiService';
 import { Icon } from './icons';
 
 interface ConferenceModalProps {
     isOpen: boolean;
     onClose: () => void;
-    gameStats: GameStats;
+    gameStats: SinglePlayerGameStats;
 }
 
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

@@ -1,12 +1,28 @@
 import React from 'react';
-import { WorldMap as WorldMapData, RegionID, FactionID } from '../types';
+import { WorldMap as WorldMapData, RegionID, FactionID, Player } from '../types';
 
-const FACTION_COLORS: Record<FactionID, string> = {
+const BASE_FACTION_COLORS: Record<FactionID, string> = {
     player: 'fill-blue-500/80 stroke-blue-300',
     eastern_alliance: 'fill-red-500/80 stroke-red-300',
     western_alliance: 'fill-green-500/80 stroke-green-300',
     neutral: 'fill-gray-600/70 stroke-gray-400',
 };
+
+const PLAYER_COLORS = [
+    'fill-blue-500/80 stroke-blue-300',
+    'fill-purple-500/80 stroke-purple-300',
+    'fill-teal-500/80 stroke-teal-300',
+    'fill-orange-500/80 stroke-orange-300',
+];
+
+const getFactionColors = (players: Player[]): Record<FactionID, string> => {
+    const colors = { ...BASE_FACTION_COLORS };
+    players.forEach((player, index) => {
+        colors[player.id] = PLAYER_COLORS[index % PLAYER_COLORS.length];
+    });
+    return colors;
+};
+
 
 const FACTION_NAMES: Record<FactionID, string> = {
     player: 'Quốc gia của bạn',
@@ -40,10 +56,15 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
 interface WorldMapProps {
     mapData: WorldMapData;
     onRegionClick: (region: RegionID) => void;
+    players?: Player[]; // For multiplayer
+    singlePlayerMilitaryRegion?: RegionID; // For singleplayer
 }
 
-export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) => {
-    const playerMilitaryRegion = Object.keys(mapData).find(key => mapData[key as RegionID].hasPlayerMilitary) as RegionID | undefined;
+export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, players = [], singlePlayerMilitaryRegion }) => {
+    
+    const FACTION_COLORS = getFactionColors(players);
+
+    const getPlayerForId = (id: string) => players.find(p => p.id === id);
 
     return (
         <div className="mt-4 flex flex-col items-center">
@@ -65,6 +86,8 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) =>
                         const regionState = mapData[regionId];
                         const faction = regionState?.controlledBy || 'neutral';
                         const isContested = regionState?.isContested;
+                        const player = getPlayerForId(faction);
+                        const factionName = player ? player.nationName : FACTION_NAMES[faction];
 
                         return (
                             <g key={regionId} className="group cursor-pointer" onClick={() => onRegionClick(regionId)}>
@@ -73,12 +96,13 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) =>
                                     className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white ${isContested ? 'contested-zone' : ''}`}
                                     strokeWidth="1.5"
                                 />
-                                <title>{`${region.name} - Kiểm soát bởi: ${FACTION_NAMES[faction]}`}</title>
+                                <title>{`${region.name} - Kiểm soát bởi: ${factionName}`}</title>
                             </g>
                         );
                     })}
-                    {playerMilitaryRegion && (
-                        <g transform={`translate(${REGION_DATA[playerMilitaryRegion].center[0]}, ${REGION_DATA[playerMilitaryRegion].center[1]})`} className="pointer-events-none">
+                    {/* Single Player Military Icon */}
+                    {singlePlayerMilitaryRegion && (
+                        <g transform={`translate(${REGION_DATA[singlePlayerMilitaryRegion].center[0]}, ${REGION_DATA[singlePlayerMilitaryRegion].center[1]})`} className="pointer-events-none">
                              <path d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z" 
                                 className="fill-yellow-300 stroke-black" 
                                 strokeWidth="0.5"
@@ -87,12 +111,34 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick }) =>
                              <title>Sự hiện diện quân sự của bạn</title>
                         </g>
                     )}
+                    {/* Multiplayer Military Icons */}
+                     {players.map(player => {
+                        const playerCorps = player.armyCorps || [];
+                        const militaryLocations = [...new Set(playerCorps.map(c => c.location))];
+                        return militaryLocations.map(locationId => {
+                             const color = FACTION_COLORS[player.id].split(' ')[0].replace('fill-', 'stroke-');
+                             return (
+                                <g key={`${player.id}-${locationId}`} transform={`translate(${REGION_DATA[locationId].center[0]}, ${REGION_DATA[locationId].center[1]})`} className="pointer-events-none">
+                                     <path d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z" 
+                                        className={`fill-yellow-300 ${color}`}
+                                        strokeWidth="1"
+                                        style={{ filter: 'url(#glow)' }}
+                                    />
+                                     <title>Quân đội của {player.nationName}</title>
+                                </g>
+                             )
+                        })
+                    })}
                 </svg>
             </div>
             <div className="w-full mt-2 px-2">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">CHÚ GIẢI BẢN ĐỒ</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1">
-                    <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
+                    {players.length > 0 ? (
+                        players.map(p => <LegendItem key={p.id} colorClass={FACTION_COLORS[p.id]} name={p.nationName} />)
+                    ) : (
+                         <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
+                    )}
                     <LegendItem colorClass={FACTION_COLORS.western_alliance} name={FACTION_NAMES.western_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.eastern_alliance} name={FACTION_NAMES.eastern_alliance} />
                     <LegendItem colorClass={FACTION_COLORS.neutral} name={FACTION_NAMES.neutral} />
