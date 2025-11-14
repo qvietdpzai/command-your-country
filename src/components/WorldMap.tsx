@@ -123,7 +123,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, armyCorps, onRegion
                          const offset = armyCorps.filter(c => c.location === corps.location).length > 1 ? (index % 4) * 12 - 18 : 0;
                         return (
                              <g key={corps.id} transform={`translate(${regionCenter[0] + offset}, ${regionCenter[1] - 8})`} className="pointer-events-none">
-                                <Icon name="army_corps" className="w-5 h-5 fill-yellow-300 stroke-black" strokeWidth="1" style={{ filter: 'url(#glow)' }} />
+                                <Icon name="armor" className="w-5 h-5 fill-yellow-300 stroke-black" strokeWidth="1" style={{ filter: 'url(#glow)' }} />
                                 <title>{`Quân đoàn: ${corps.name}`}</title>
                             </g>
                         )
