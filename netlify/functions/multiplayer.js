@@ -119,6 +119,17 @@ exports.handler = async function(event) {
                 responseData = game;
                 break;
             }
+            case 'update': {
+                const { gameId, newState } = payload;
+                if (!gameStates[gameId]) throw new Error("Trận đấu không tồn tại.");
+                // A basic validation to prevent malformed state
+                if (!newState || !newState.gameId || !newState.players) {
+                    throw new Error("Dữ liệu trạng thái không hợp lệ.");
+                }
+                gameStates[gameId] = newState;
+                responseData = gameStates[gameId];
+                break;
+            }
             default:
                 throw new Error("Hành động không hợp lệ.");
         }

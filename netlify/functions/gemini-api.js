@@ -48,6 +48,33 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
     return JSON.parse(response.text.trim());
 };
 
+// --- CONFERENCE LOGIC ---
+const conferenceSystemInstruction = `Bạn là một hội đồng cố vấn chiến lược AI cho Tổng tư lệnh (người chơi) của một quốc gia trong WW3. Bạn bao gồm ba thành viên:
+- **Tướng quân Strategos (Quân sự):** Giọng điệu quyết đoán, thực dụng. Tập trung vào sức mạnh quân sự, chiến thuật, phòng thủ và tấn công.
+- **Bộ trưởng Economos (Kinh tế):** Giọng điệu thận trọng, dựa trên dữ liệu. Tập trung vào kinh tế, tăng trưởng, tài nguyên và hậu cần.
+- **Nhà ngoại giao Diplomatica (Ngoại giao):** Giọng điệu khôn khéo, tinh tế. Tập trung vào quan hệ quốc tế, tinh thần dân chúng và các phe phái.
+
+Khi người chơi hỏi, hãy trả lời với tư cách là hội đồng, tổng hợp quan điểm của các thành viên. Bắt đầu câu trả lời của bạn bằng cách xác định (các) cố vấn đang phát biểu (ví dụ: "Tướng quân Strategos: ...", "Bộ trưởng Economos và tôi, Diplomatica, đồng ý rằng..."). Phân tích trạng thái trò chơi hiện tại được cung cấp và lịch sử trò chuyện để đưa ra lời khuyên phù hợp, sâu sắc và mang tính chiến lược. Giữ cho các câu trả lời tương đối ngắn gọn và đi thẳng vào vấn đề.`;
+
+const handleGetConferenceResponse = async (currentStats, history, playerAction) => {
+    let prompt = `${conferenceSystemInstruction}\n\nLỊCH SỬ HỘI THOẠI:\n`;
+    history.forEach(msg => {
+        prompt += `${msg.role === 'user' ? 'Tổng tư lệnh' : 'Hội đồng'}: ${msg.text}\n`;
+    });
+    prompt += `\nTRẠNG THÁI TRÒ CHƠI HIỆN TẠI: ${JSON.stringify(currentStats)}\n\nYÊU CẦU MỚI CỦA TỔNG TƯ LỆNH: ${playerAction}\n\nHãy trả lời với tư cách hội đồng.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+
+    if (!response || !response.text) {
+        throw new Error("AI model failed to generate a conference response.");
+    }
+    
+    return { responseText: response.text.trim() };
+};
+
 // --- MULTIPLAYER LOGIC ---
 const mpSystemInstruction = `Bạn là AI quản trò cho một trò chơi chiến lược nhiều người chơi có tên 'WW3: Xung đột toàn cầu'. Vai trò của bạn là cập nhật trạng thái trò chơi dựa trên hành động của người chơi đang hoạt động.
 
@@ -62,7 +89,6 @@ QUY TẮC:
 `;
 
 const handleProcessMultiplayerTurn = async (currentStats, playerAction) => {
-    // We cannot send a schema for the whole game state as it's too complex. We rely on prompting.
     const prompt = `${mpSystemInstruction}\n\nTrạng thái trò chơi hiện tại:\n${JSON.stringify(currentStats, null, 2)}\n\nHành động của người chơi '${currentStats.activePlayerId}': "${playerAction}"\n\nDựa vào các quy tắc, hãy xử lý lượt đi và trả về TOÀN BỘ đối tượng JSON trạng thái trò chơi đã được cập nhật. Đảm bảo JSON trả về là hợp lệ.`;
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -103,7 +129,9 @@ exports.handler = async function(event) {
             case 'generateNationalEmblem':
                 responseData = { imageUrl: await handleGenerateNationalEmblem(payload.nationName) };
                 break;
-            // 'getConferenceResponse' can be added here if needed for SP
+            case 'getConferenceResponse':
+                responseData = await handleGetConferenceResponse(payload.currentStats, payload.history, payload.playerAction);
+                break;
             default:
                 return { statusCode: 400, body: JSON.stringify({ message: "Invalid action." }) };
         }

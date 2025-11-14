@@ -32,3 +32,7 @@ export const getGameState = async (gameId: string): Promise<MultiplayerGameStats
 export const setPlayerReady = async (gameId: string, playerId: string, nationName: string, emblemImageUrl: string): Promise<MultiplayerGameStats> => {
     return callApi('setReady', { gameId, playerId, nationName, emblemImageUrl });
 };
+
+export const updateGameState = async (gameId: string, newState: MultiplayerGameStats): Promise<MultiplayerGameStats> => {
+    return callApi('update', { gameId, newState });
+};

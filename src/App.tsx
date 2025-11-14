@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getNextTurn, generateNationalEmblem, processMultiplayerTurn } from './services/geminiService';
-import { createGame, getGameState, joinGame, setPlayerReady } from './services/multiplayerService';
+import { createGame, getGameState, joinGame, setPlayerReady, updateGameState } from './services/multiplayerService';
 import { SinglePlayerGameStats, MilitaryStats, SinglePlayerTurnResponse, WorldMap, RegionID, MultiplayerGameStats, Player } from './types';
 import { Icon } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { RegionDetail } from './components/RegionDetail';
 import { ArmyCorpsManager } from './components/ArmyCorpsManager';
+import { ConferenceModal } from './components/ConferenceModal';
 import { soundService, SoundName } from './services/soundService';
 
 // --- CONSTANTS & HELPERS ---
@@ -92,6 +93,7 @@ const App: React.FC = () => {
     const [playerInput, setPlayerInput] = useState('');
     const [tempNationName, setTempNationName] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
+    const [isConferenceOpen, setIsConferenceOpen] = useState(false);
     const audioInitialized = useRef(false);
 
     // Single-Player State
@@ -224,7 +226,11 @@ const App: React.FC = () => {
             const updatedState = await getGameState(mpGameId);
             if (updatedState) {
                 setMpGameStats(updatedState);
-                if (updatedState.isStarted) setMpGameState('playing');
+                if (updatedState.isGameOver) {
+                    setMpGameState('gameOver');
+                } else if (updatedState.isStarted) {
+                    setMpGameState('playing');
+                }
             }
         } catch (error) {
             console.error("Polling error:", error);
@@ -235,13 +241,13 @@ const App: React.FC = () => {
     }, [gameMode, mpGameId, mpPlayerId, mpGameStats]);
 
     useEffect(() => {
-        if (gameMode === 'online' && mpGameId) {
+        if (gameMode === 'online' && mpGameId && mpGameState !== 'gameOver') {
             pollGameState();
         }
         return () => {
             if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
         };
-    }, [gameMode, mpGameId, pollGameState]);
+    }, [gameMode, mpGameId, mpGameState, pollGameState]);
 
     const handleCreateMpGame = async () => {
         setIsLoading(true);
@@ -282,13 +288,25 @@ const App: React.FC = () => {
         if (isLoading || !playerInput.trim() || !mpGameStats || mpGameStats.activePlayerId !== mpPlayerId) return;
         setIsLoading(true);
         playSoundWithInit('send_command');
-        const newState = await processMultiplayerTurn(mpGameStats, playerInput);
+        
+        const processedState = await processMultiplayerTurn(mpGameStats, playerInput);
+        
+        if (processedState.gameLog[0].startsWith('Lỗi:')) {
+            setMpGameStats(processedState);
+        } else {
+            const finalState = await updateGameState(mpGameStats.gameId, processedState);
+            setMpGameStats(finalState);
+            if (finalState.isGameOver) {
+                setMpGameState('gameOver');
+            }
+        }
+
         playSoundWithInit('receive_response');
         setPlayerInput('');
-        setMpGameStats(newState);
         setIsLoading(false);
+        // Immediately start polling for the opponent's turn after our action
+        setTimeout(() => pollGameState(), 100); 
     };
-
 
     // --- RENDER LOGIC ---
     const renderMenu = () => (
@@ -365,7 +383,6 @@ const App: React.FC = () => {
                         <p className="text-gray-400 mb-4">ID Trận đấu: <strong className="text-yellow-400 font-mono cursor-pointer" onClick={() => navigator.clipboard.writeText(mpGameId)}>{mpGameId}</strong> (nhấn để sao chép)</p>
                         <p className="text-gray-500 mb-8">Chia sẻ ID này với đối thủ của bạn. Trò chơi sẽ bắt đầu khi cả hai sẵn sàng.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
-                            {/* Player 1 (Me) */}
                             <div className="bg-black/30 p-4 rounded-lg">
                                 <h3 className="text-xl font-bold text-blue-400 mb-4">Bạn ({me?.isReady ? "Sẵn sàng" : "Chưa sẵn sàng"})</h3>
                                 {me?.isReady ? <p className="text-2xl font-bold">{me.nationName}</p> :
@@ -375,7 +392,6 @@ const App: React.FC = () => {
                                     </form>
                                 }
                             </div>
-                            {/* Player 2 (Opponent) */}
                             <div className="bg-black/30 p-4 rounded-lg">
                                 <h3 className="text-xl font-bold text-purple-400 mb-4">Đối thủ ({opponent?.isReady ? "Sẵn sàng" : "Đang chờ..."})</h3>
                                 {opponent ? <p className="text-2xl font-bold">{opponent.isReady ? opponent.nationName : "..."}</p> : <p>Đang chờ người chơi...</p>}
@@ -460,7 +476,21 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-3 bg-black/30 p-4 rounded-lg border border-gray-700 flex flex-col">
-                     <h2 className="text-xl font-bold text-center text-gray-300 border-b border-gray-600 pb-2 mb-2">TRUNG TÂM CHỈ HUY</h2>
+                     <div className="flex justify-between items-center border-b border-gray-600 pb-2 mb-2">
+                        <div className="w-8"></div>
+                        <h2 className="text-xl font-bold text-center text-gray-300">TRUNG TÂM CHỈ HUY</h2>
+                        <div className="w-8 text-right">
+                           {!isMultiplayer && (
+                                <button
+                                    onClick={() => setIsConferenceOpen(true)}
+                                    className="text-gray-400 hover:text-white"
+                                    title="Hội nghị với cố vấn"
+                                >
+                                    <Icon name="conference" className="w-6 h-6" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
                     <div className="font-mono bg-black/50 p-3 rounded h-40 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
                         <div>{eventLog.map((event, index) => <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : 'text-gray-300'}>{event}</p>)}</div>
                     </div>
@@ -499,6 +529,13 @@ const App: React.FC = () => {
             <main className="w-full max-w-7xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700 glow-border">
                 {renderContent()}
             </main>
+            {gameMode === 'offline' && (
+                <ConferenceModal
+                    isOpen={isConferenceOpen}
+                    onClose={() => setIsConferenceOpen(false)}
+                    gameStats={spStats}
+                />
+            )}
             <footer className="absolute bottom-4 text-center text-gray-600 text-xs z-10"><p>Một trải nghiệm chiến lược được cung cấp bởi Google Gemini API.</p></footer>
         </div>
     );
