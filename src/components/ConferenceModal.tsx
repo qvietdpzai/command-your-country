@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 // Fix: Replaced GameStats with SinglePlayerGameStats as GameStats is no longer exported from types.
 import { SinglePlayerGameStats, ChatMessage } from '../types';
 import { getConferenceResponse } from '../services/geminiService';
-import { Icon, IconProps } from './icons';
+import { Icon } from './icons';
+import type { IconProps } from './icons';
 
 interface ConferenceModalProps {
     isOpen: boolean;
