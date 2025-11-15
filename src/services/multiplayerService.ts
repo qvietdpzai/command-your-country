@@ -1,4 +1,4 @@
-import { MultiplayerGameStats } from '../types';
+import { MultiplayerGameStats, SetupData } from '../types';
 
 const API_ENDPOINT = '/.netlify/functions/multiplayer';
 
@@ -29,8 +29,8 @@ export const getGameState = async (gameId: string): Promise<MultiplayerGameStats
     return callApi('get', { gameId });
 };
 
-export const setPlayerReady = async (gameId: string, playerId: string, nationName: string, emblemImageUrl: string): Promise<MultiplayerGameStats> => {
-    return callApi('setReady', { gameId, playerId, nationName, emblemImageUrl });
+export const setPlayerReady = async (gameId: string, playerId: string, setupData: SetupData): Promise<MultiplayerGameStats> => {
+    return callApi('setReady', { gameId, playerId, setupData });
 };
 
 export const updateGameState = async (gameId: string, newState: MultiplayerGameStats): Promise<MultiplayerGameStats> => {

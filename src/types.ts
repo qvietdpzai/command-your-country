@@ -100,6 +100,7 @@ export interface Player {
     nationName: string;
     emblemImageUrl: string | null;
     isReady: boolean;
+    nationalContext?: string;
     military: MilitaryStats;
     economy: number;
     manpower: number;
@@ -125,4 +126,12 @@ export interface MultiplayerGameStats {
 export interface ChatMessage {
     role: 'user' | 'model';
     text: string;
+}
+
+// --- SETUP ---
+export interface SetupData {
+    nationName: string;
+    nationalContext: string;
+    emblemImageUrl: string;
+    startingTerritory: RegionID;
 }

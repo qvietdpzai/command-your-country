@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getNextTurn, generateNationalEmblem, processMultiplayerTurn } from './services/geminiService';
+import { getNextTurn, processMultiplayerTurn } from './services/geminiService';
 import { createGame, getGameState, joinGame, setPlayerReady, updateGameState } from './services/multiplayerService';
-import { SinglePlayerGameStats, MilitaryStats, SinglePlayerTurnResponse, WorldMap, RegionID, MultiplayerGameStats, Player } from './types';
+import { SinglePlayerGameStats, MilitaryStats, SinglePlayerTurnResponse, WorldMap, RegionID, MultiplayerGameStats, Player, SetupData } from './types';
 import { Icon, IconProps } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
@@ -23,7 +23,7 @@ const createInitialMap = (): WorldMap => {
     REGIONS.forEach(region => {
         map[region] = { controlledBy: 'neutral', fortificationLevel: 1, isContested: false, militaryPresence: [] };
     });
-    map['north_america'] = { ...map['north_america']!, controlledBy: 'player', fortificationLevel: 2, hasPlayerMilitary: true };
+    // These are base NPC territories, player territories are now set dynamically
     map['western_europe']!.controlledBy = 'western_alliance';
     map['east_asia']!.controlledBy = 'eastern_alliance';
     map['eastern_europe']!.controlledBy = 'eastern_alliance';
@@ -44,12 +44,6 @@ type GameMode = 'menu' | 'offline' | 'online';
 type OfflineGameState = 'setup' | 'playing' | 'gameOver';
 type OnlineGameState = 'entry' | 'lobby' | 'playing' | 'gameOver';
 
-interface SetupData {
-    nationName: string;
-    nationalContext: string;
-    emblemImageUrl: string;
-    startingTerritory: RegionID;
-}
 
 const useTypingEffect = (text: string = '', speed: number = 25): string => {
     const [displayedText, setDisplayedText] = useState('');
@@ -118,10 +112,9 @@ const App: React.FC = () => {
     const [mpGameId, setMpGameId] = useState('');
     const [mpPlayerId, setMpPlayerId] = useState<string | null>(null);
     const [mpJoinId, setMpJoinId] = useState('');
-    const [tempNationName, setTempNationName] = useState('');
     const pollingTimeoutRef = useRef<number | null>(null);
 
-    // Typing effects - Moved to top level to obey Rules of Hooks
+    // Typing effects
     const animatedScenario = useTypingEffect(isLoading ? '' : (spTurnData?.scenario || ''));
     const [mpLogText, setMpLogText] = useState('');
     const animatedMpLog = useTypingEffect(isLoading ? '' : mpLogText);
@@ -142,7 +135,7 @@ const App: React.FC = () => {
     }, []);
     const playSoundWithInit = useCallback((sound: SoundName) => { initializeAudio(); soundService.playSound(sound); }, [initializeAudio]);
 
-    // --- Single-Player Logic with Safe LocalStorage ---
+    // --- Single-Player Logic ---
     useEffect(() => {
         try {
             const savedGame = localStorage.getItem(SINGLE_PLAYER_SAVE_KEY);
@@ -157,18 +150,14 @@ const App: React.FC = () => {
         try {
             localStorage.setItem(SINGLE_PLAYER_SAVE_KEY, JSON.stringify({ stats, turnData, eventLog }));
             setHasSaveGame(true);
-        } catch (e) {
-            console.warn("Could not save game to localStorage:", e);
-        }
+        } catch (e) { console.warn("Could not save game to localStorage:", e); }
     };
 
     const clearSpSaveGame = () => {
         try {
             localStorage.removeItem(SINGLE_PLAYER_SAVE_KEY);
             setHasSaveGame(false);
-        } catch (e) {
-            console.warn("Could not clear saved game from localStorage:", e);
-        }
+        } catch (e) { console.warn("Could not clear saved game from localStorage:", e); }
     };
 
     const loadSpGame = () => {
@@ -199,18 +188,6 @@ const App: React.FC = () => {
         setPlayerInput('');
     
         const newMap = createInitialMap();
-        // Reset any default 'player' controlled territory
-        Object.keys(newMap).forEach(key => {
-            const regionId = key as RegionID;
-            if (newMap[regionId].controlledBy === 'player') {
-                newMap[regionId].controlledBy = 'neutral';
-                if (newMap[regionId].hasPlayerMilitary) {
-                    newMap[regionId].hasPlayerMilitary = false;
-                }
-            }
-        });
-
-        // Set the player's chosen starting territory
         newMap[setupData.startingTerritory].controlledBy = 'player';
         newMap[setupData.startingTerritory].hasPlayerMilitary = true;
     
@@ -223,7 +200,6 @@ const App: React.FC = () => {
         };
         
         setSpStats(currentStats);
-
         const initialTurn = await getNextTurn(currentStats, null);
     
         currentStats = { ...currentStats, policies: [initialTurn.policySummary] };
@@ -320,6 +296,8 @@ const App: React.FC = () => {
             const { gameId, playerId } = await createGame();
             setMpGameId(gameId);
             setMpPlayerId(playerId);
+            const initialGameState = await getGameState(gameId);
+            setMpGameStats(initialGameState);
             setMpGameState('lobby');
         } catch (error) { alert("Không thể tạo trận đấu."); }
         setIsLoading(false);
@@ -338,14 +316,16 @@ const App: React.FC = () => {
         setIsLoading(false);
     };
 
-    const handleSetMpReady = async () => {
-        if (!tempNationName.trim() || !mpGameId || !mpPlayerId) return;
+    const handleMpNationSelected = async (setupData: SetupData) => {
+        if (!mpGameId || !mpPlayerId) return;
         setIsLoading(true);
         try {
-            const emblemImageUrl = await generateNationalEmblem(tempNationName);
-            const updatedState = await setPlayerReady(mpGameId, mpPlayerId, tempNationName, emblemImageUrl);
+            const updatedState = await setPlayerReady(mpGameId, mpPlayerId, setupData);
             setMpGameStats(updatedState);
-        } catch (error) { alert("Lỗi khi sẵn sàng."); }
+        } catch (error) {
+            const errorMessage = (error instanceof Error) ? error.message : "Lỗi khi chọn quốc gia.";
+            alert(errorMessage);
+        }
         setIsLoading(false);
     };
 
@@ -369,7 +349,6 @@ const App: React.FC = () => {
         playSoundWithInit('receive_response');
         setPlayerInput('');
         setIsLoading(false);
-        // Immediately start polling for the opponent's turn after our action
         setTimeout(() => pollGameState(), 100); 
     };
 
@@ -413,7 +392,7 @@ const App: React.FC = () => {
                 </div>
             );
             case 'playing': 
-                if (!spStats) return null; // Should not happen in playing state
+                if (!spStats) return null;
                 return renderPlayingUI(spStats, spEventLog, spTurnData?.damageReport || '', spTurnData?.worldStatus || '', animatedScenario);
         }
     }
@@ -437,31 +416,52 @@ const App: React.FC = () => {
                     </div>
                 </div>
             );
-            case 'lobby':
-                const me = mpGameStats?.players.find(p => p.id === mpPlayerId);
-                const opponent = mpGameStats?.players.find(p => p.id !== mpPlayerId);
+            case 'lobby': {
+                if (!mpGameStats) return <div className="text-center">Đang tải phòng chờ...</div>;
+                const me = mpGameStats.players.find(p => p.id === mpPlayerId);
+
+                if (me && !me.isReady) {
+                    return (
+                        <GameSetup
+                            onSetupComplete={handleMpNationSelected}
+                            onBackToMenu={() => {
+                                setGameMode('menu');
+                                setMpGameState('entry');
+                                setMpGameStats(null);
+                                setMpGameId('');
+                            }}
+                            isLoading={isLoading}
+                        />
+                    );
+                }
+
+                const opponent = mpGameStats.players.find(p => p.id !== mpPlayerId);
                 return (
                     <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
                         <h2 className="text-3xl font-bold text-gray-200 mb-2">Phòng chờ Trực tuyến</h2>
                         <p className="text-gray-400 mb-4">ID Trận đấu: <strong className="text-yellow-400 font-mono cursor-pointer" onClick={() => navigator.clipboard.writeText(mpGameId)}>{mpGameId}</strong> (nhấn để sao chép)</p>
                         <p className="text-gray-500 mb-8">Chia sẻ ID này với đối thủ của bạn. Trò chơi sẽ bắt đầu khi cả hai sẵn sàng.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
-                            <div className="bg-black/30 p-4 rounded-lg">
-                                <h3 className="text-xl font-bold text-blue-400 mb-4">Bạn ({me?.isReady ? "Sẵn sàng" : "Chưa sẵn sàng"})</h3>
-                                {me?.isReady ? <p className="text-2xl font-bold">{me.nationName}</p> :
-                                    <form onSubmit={e => { e.preventDefault(); handleSetMpReady(); }} className="flex flex-col gap-2">
-                                        <input type="text" value={tempNationName} onChange={e => setTempNationName(e.target.value)} placeholder="Tên quốc gia của bạn" className="bg-gray-900 border-2 border-gray-600 rounded-lg p-3 text-white text-center" />
-                                        <button type="submit" disabled={isLoading || !tempNationName} className="bg-green-600 hover:bg-green-700 text-white font-bold p-3 rounded-lg disabled:opacity-50">Sẵn sàng</button>
-                                    </form>
-                                }
+                             <div className="bg-black/30 p-4 rounded-lg flex flex-col items-center justify-center">
+                                <h3 className="text-xl font-bold text-blue-400 mb-4">Bạn (Sẵn sàng)</h3>
+                                {me && me.emblemImageUrl && <img src={me.emblemImageUrl} alt="My Emblem" className="w-24 h-24 rounded-full border-2 border-blue-400 object-cover bg-gray-800"/>}
+                                <p className="text-2xl font-bold mt-2">{me?.nationName}</p>
                             </div>
-                            <div className="bg-black/30 p-4 rounded-lg">
+                            <div className="bg-black/30 p-4 rounded-lg flex flex-col items-center justify-center">
                                 <h3 className="text-xl font-bold text-purple-400 mb-4">Đối thủ ({opponent?.isReady ? "Sẵn sàng" : "Đang chờ..."})</h3>
-                                {opponent ? <p className="text-2xl font-bold">{opponent.isReady ? opponent.nationName : "..."}</p> : <p>Đang chờ người chơi...</p>}
+                                {opponent?.isReady ? (
+                                    <>
+                                        {opponent.emblemImageUrl && <img src={opponent.emblemImageUrl} alt="Opponent Emblem" className="w-24 h-24 rounded-full border-2 border-purple-400 object-cover bg-gray-800"/>}
+                                        <p className="text-2xl font-bold mt-2">{opponent.nationName}</p>
+                                    </>
+                                ) : (
+                                    <p>Đang chờ người chơi...</p>
+                                )}
                             </div>
                         </div>
                     </div>
                 );
+            }
             case 'playing':
                 const mePlayer = mpGameStats?.players.find(p => p.id === mpPlayerId);
                 if (!mePlayer || !mpGameStats) return <div>Đang tải...</div>;

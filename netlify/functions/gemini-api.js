@@ -48,7 +48,7 @@ const handleGetNextTurn = async (currentStats, playerAction) => {
         : '';
     
     const prompt = `${spSystemInstruction}${contextPrompt}\nBối cảnh trò chơi hiện tại (JSON): ${JSON.stringify(currentStats)}\nHành động của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}\nDựa trên bối cảnh và hành động trên, hãy tạo ra phản hồi JSON cho lượt đi này theo schema đã cho.`;
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: "application/json", responseSchema: spResponseSchema, temperature: 0.8 } });
+    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: "application/json", responseSchema: spResponseSchema, temperature: 0.8, thinkingConfig: { thinkingBudget: 0 } } });
     if (!response || !response.text) throw new Error("AI model failed to generate a response.");
     return JSON.parse(response.text.trim());
 };
@@ -71,6 +71,9 @@ const handleGetConferenceResponse = async (currentStats, history, playerAction) 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
+        config: {
+            thinkingConfig: { thinkingBudget: 0 }
+        }
     });
 
     if (!response || !response.text) {
@@ -98,7 +101,7 @@ const handleProcessMultiplayerTurn = async (currentStats, playerAction) => {
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
-        config: { responseMimeType: "application/json", temperature: 0.7 }
+        config: { responseMimeType: "application/json", temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } }
     });
     if (!response || !response.text) throw new Error("AI model failed to a multiplayer response.");
     const jsonText = response.text.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');

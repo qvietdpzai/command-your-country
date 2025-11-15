@@ -26,6 +26,7 @@ const createInitialPlayer = (id) => ({
     nationName: `Quốc gia của ${id}`,
     emblemImageUrl: null,
     isReady: false,
+    nationalContext: '',
     military: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 },
     economy: 2000,
     manpower: 10000000,
@@ -63,7 +64,6 @@ exports.handler = async function(event) {
                 const player1Id = 'player1';
                 const player1 = createInitialPlayer(player1Id);
                 const map = createInitialMap();
-                map['north_america'] = { ...map['north_america'], controlledBy: player1Id };
                 
                 gameStates[gameId] = {
                     gameId,
@@ -87,8 +87,7 @@ exports.handler = async function(event) {
                 const player2Id = 'player2';
                 const player2 = createInitialPlayer(player2Id);
                 game.players.push(player2);
-                game.worldMap['south_america'] = { ...game.worldMap['south_america'], controlledBy: player2Id };
-
+                
                 responseData = { gameState: game, playerId: player2Id };
                 break;
             }
@@ -99,16 +98,25 @@ exports.handler = async function(event) {
                 break;
             }
             case 'setReady': {
-                const { gameId, playerId, nationName, emblemImageUrl } = payload;
+                const { gameId, playerId, setupData } = payload;
                 const game = gameStates[gameId];
                 if (!game) throw new Error("Trận đấu không tồn tại.");
                 
                 const player = game.players.find(p => p.id === playerId);
                 if (!player) throw new Error("Người chơi không tồn tại.");
 
+                const { nationName, emblemImageUrl, nationalContext, startingTerritory } = setupData;
+
+                if (game.worldMap[startingTerritory].controlledBy !== 'neutral') {
+                    throw new Error("Lãnh thổ đã bị người chơi khác chọn. Vui lòng chọn lãnh thổ khác.");
+                }
+
                 player.isReady = true;
                 player.nationName = nationName;
                 player.emblemImageUrl = emblemImageUrl;
+                player.nationalContext = nationalContext;
+                
+                game.worldMap[startingTerritory].controlledBy = playerId;
 
                 // Check if all players are ready to start the game
                 if (game.players.length === 2 && game.players.every(p => p.isReady)) {
