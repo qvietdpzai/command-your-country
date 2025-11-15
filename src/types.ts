@@ -63,6 +63,7 @@ export interface MapChange {
 export interface SinglePlayerGameStats {
     nationName: string;
     emblemImageUrl: string | null;
+    nationalContext?: string;
     military: MilitaryStats;
     economy: number;
     manpower: number;

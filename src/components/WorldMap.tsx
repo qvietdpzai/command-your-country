@@ -56,11 +56,13 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
 interface WorldMapProps {
     mapData: WorldMapData;
     onRegionClick: (region: RegionID) => void;
-    players?: Player[]; // For multiplayer
-    singlePlayerMilitaryRegion?: RegionID; // For singleplayer
+    players?: Player[];
+    singlePlayerMilitaryRegion?: RegionID;
+    selectableRegions?: RegionID[];
+    selectedRegion?: RegionID | null;
 }
 
-export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, players = [], singlePlayerMilitaryRegion }) => {
+export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, players = [], singlePlayerMilitaryRegion, selectableRegions, selectedRegion }) => {
     
     const FACTION_COLORS = getFactionColors(players);
 
@@ -89,14 +91,21 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, play
                         const player = getPlayerForId(faction);
                         const factionName = player ? player.nationName : FACTION_NAMES[faction];
 
+                        const isSelectable = selectableRegions?.includes(regionId);
+                        const isSelected = selectedRegion === regionId;
+
                         return (
-                            <g key={regionId} className="group cursor-pointer" onClick={() => onRegionClick(regionId)}>
+                            <g 
+                                key={regionId} 
+                                className={`group ${isSelectable ? 'cursor-pointer' : ''}`} 
+                                onClick={() => { if (isSelectable) onRegionClick(regionId); else if (!selectableRegions) { onRegionClick(regionId)}}}
+                            >
                                 <path
                                     d={region.path}
-                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white ${isContested ? 'contested-zone' : ''}`}
-                                    strokeWidth="1.5"
+                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 ${isSelectable ? 'group-hover:stroke-white' : ''} ${isSelected ? 'stroke-yellow-400' : ''} ${isContested ? 'contested-zone' : ''}`}
+                                    strokeWidth={isSelected ? "2.5" : "1.5"}
                                 />
-                                <title>{`${region.name} - Kiểm soát bởi: ${factionName}`}</title>
+                                <title>{`${region.name} - ${isSelectable ? 'Có thể chọn' : `Kiểm soát bởi: ${factionName}`}`}</title>
                             </g>
                         );
                     })}

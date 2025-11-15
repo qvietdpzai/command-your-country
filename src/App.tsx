@@ -9,6 +9,7 @@ import { RegionDetail } from './components/RegionDetail';
 import { ArmyCorpsManager } from './components/ArmyCorpsManager';
 import { ConferenceModal } from './components/ConferenceModal';
 import { soundService, SoundName } from './services/soundService';
+import { GameSetup } from './components/GameSetup';
 
 // --- CONSTANTS & HELPERS ---
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
@@ -32,15 +33,22 @@ const createInitialMap = (): WorldMap => {
     return map as WorldMap;
 };
 
-const INITIAL_SP_STATS: SinglePlayerGameStats = {
+const INITIAL_SP_STATS: Omit<SinglePlayerGameStats, 'worldMap' | 'nationName' | 'emblemImageUrl'> = {
     military: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 },
     economy: 2000, manpower: 10000000, morale: 70, diplomacy: 60, economicGrowth: 0.5,
-    worldMap: createInitialMap(), policies: [], nationName: '', emblemImageUrl: null, armyCorps: [],
+    policies: [], armyCorps: [],
 };
 
 type GameMode = 'menu' | 'offline' | 'online';
-type OfflineGameState = 'naming' | 'playing' | 'gameOver';
+type OfflineGameState = 'setup' | 'playing' | 'gameOver';
 type OnlineGameState = 'entry' | 'lobby' | 'playing' | 'gameOver';
+
+interface SetupData {
+    nationName: string;
+    nationalContext: string;
+    emblemImageUrl: string;
+    startingTerritory: RegionID;
+}
 
 const useTypingEffect = (text: string = '', speed: number = 25): string => {
     const [displayedText, setDisplayedText] = useState('');
@@ -91,16 +99,15 @@ const App: React.FC = () => {
     const [gameMode, setGameMode] = useState<GameMode>('menu');
     const [isLoading, setIsLoading] = useState(false);
     const [playerInput, setPlayerInput] = useState('');
-    const [tempNationName, setTempNationName] = useState('');
     const [selectedRegion, setSelectedRegion] = useState<RegionID | null>(null);
     const [isConferenceOpen, setIsConferenceOpen] = useState(false);
     const audioInitialized = useRef(false);
 
     // Single-Player State
-    const [spStats, setSpStats] = useState<SinglePlayerGameStats>(INITIAL_SP_STATS);
+    const [spStats, setSpStats] = useState<SinglePlayerGameStats | null>(null);
     const [spTurnData, setSpTurnData] = useState<SinglePlayerTurnResponse | null>(null);
     const [spEventLog, setSpEventLog] = useState<string[]>([]);
-    const [spGameState, setSpGameState] = useState<OfflineGameState>('naming');
+    const [spGameState, setSpGameState] = useState<OfflineGameState>('setup');
     const [spGameOverMessage, setSpGameOverMessage] = useState('');
     const [hasSaveGame, setHasSaveGame] = useState(false);
 
@@ -110,6 +117,7 @@ const App: React.FC = () => {
     const [mpGameId, setMpGameId] = useState('');
     const [mpPlayerId, setMpPlayerId] = useState<string | null>(null);
     const [mpJoinId, setMpJoinId] = useState('');
+    const [tempNationName, setTempNationName] = useState('');
     const pollingTimeoutRef = useRef<number | null>(null);
 
     // Typing effects - Moved to top level to obey Rules of Hooks
@@ -181,29 +189,55 @@ const App: React.FC = () => {
         }
     };
     
-    const handleSpNationCreation = useCallback(async () => {
-        if (!tempNationName.trim() || isLoading) return;
+    const handleSetupComplete = useCallback(async (setupData: SetupData) => {
         playSoundWithInit('start_game');
         clearSpSaveGame();
         setIsLoading(true);
         setSpGameState('playing');
         setSpEventLog([]);
         setPlayerInput('');
-        let currentStats: SinglePlayerGameStats = { ...INITIAL_SP_STATS, nationName: tempNationName };
+    
+        const newMap = createInitialMap();
+        // Reset any default 'player' controlled territory
+        Object.keys(newMap).forEach(key => {
+            const regionId = key as RegionID;
+            if (newMap[regionId].controlledBy === 'player') {
+                newMap[regionId].controlledBy = 'neutral';
+                if (newMap[regionId].hasPlayerMilitary) {
+                    newMap[regionId].hasPlayerMilitary = false;
+                }
+            }
+        });
+
+        // Set the player's chosen starting territory
+        newMap[setupData.startingTerritory].controlledBy = 'player';
+        newMap[setupData.startingTerritory].hasPlayerMilitary = true;
+    
+        let currentStats: SinglePlayerGameStats = { 
+            ...INITIAL_SP_STATS, 
+            nationName: setupData.nationName,
+            emblemImageUrl: setupData.emblemImageUrl,
+            nationalContext: setupData.nationalContext,
+            worldMap: newMap,
+        };
+        
         setSpStats(currentStats);
-        const [emblemUrl, initialTurn] = await Promise.all([generateNationalEmblem(tempNationName), getNextTurn(currentStats, null)]);
-        currentStats = { ...currentStats, emblemImageUrl: emblemUrl, policies: [initialTurn.policySummary] };
+
+        const initialTurn = await getNextTurn(currentStats, null);
+    
+        currentStats = { ...currentStats, policies: [initialTurn.policySummary] };
         setSpStats(currentStats);
         setSpTurnData(initialTurn);
         const newLog = [initialTurn.outcome];
         setSpEventLog(newLog);
+        
         saveSpGame(currentStats, initialTurn, newLog);
         setIsLoading(false);
         playSoundWithInit('receive_response');
-    }, [tempNationName, isLoading, playSoundWithInit]);
+    }, [playSoundWithInit]);
 
     const handleSpAction = useCallback(async () => {
-        if (isLoading || spGameState !== 'playing' || !playerInput.trim()) return;
+        if (isLoading || spGameState !== 'playing' || !playerInput.trim() || !spStats) return;
         playSoundWithInit('send_command');
         setIsLoading(true);
         const newEventLog = [`> ${playerInput}`, ...spEventLog];
@@ -347,7 +381,7 @@ const App: React.FC = () => {
                 <button onClick={() => { playSoundWithInit('ui_click'); setGameMode('online'); }} className="flex items-center gap-3 bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
                     <Icon name="diplomacy" className="w-6 h-6" /> Đối kháng Trực tuyến
                 </button>
-                <button onClick={() => { playSoundWithInit('ui_click'); setGameMode('offline'); setSpGameState(hasSaveGame ? 'naming' : 'naming'); }} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
+                <button onClick={() => { playSoundWithInit('ui_click'); setGameMode('offline'); setSpGameState('setup'); }} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
                     <Icon name="play" className="w-6 h-6" /> Chiến dịch Ngoại tuyến
                 </button>
             </div>
@@ -361,16 +395,12 @@ const App: React.FC = () => {
     
     const renderOffline = () => {
         switch (spGameState) {
-            case 'naming': return (
-                <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
-                    <h2 className="text-3xl font-bold text-gray-200 mb-4">Đặt tên cho quốc gia của bạn</h2>
-                    <form onSubmit={(e) => { e.preventDefault(); handleSpNationCreation(); }} className="w-full max-w-sm flex flex-col gap-4">
-                        <input type="text" value={tempNationName} onChange={(e) => setTempNationName(e.target.value)} placeholder="Ví dụ: Cộng hòa Astoria" className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-4 text-white text-center text-xl" autoFocus />
-                        <button type="submit" disabled={!tempNationName.trim()} className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl disabled:opacity-50">
-                            <Icon name="play" className="w-6 h-6" /> Bắt đầu
-                        </button>
-                    </form>
-                </div>
+            case 'setup': return (
+                <GameSetup 
+                    onSetupComplete={handleSetupComplete}
+                    onBackToMenu={() => setGameMode('menu')}
+                    isLoading={isLoading}
+                />
             );
             case 'gameOver': return (
                 <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
@@ -381,7 +411,9 @@ const App: React.FC = () => {
                     </button>
                 </div>
             );
-            case 'playing': return renderPlayingUI(spStats, spEventLog, spTurnData?.damageReport || '', spTurnData?.worldStatus || '', animatedScenario);
+            case 'playing': 
+                if (!spStats) return null; // Should not happen in playing state
+                return renderPlayingUI(spStats, spEventLog, spTurnData?.damageReport || '', spTurnData?.worldStatus || '', animatedScenario);
         }
     }
 
@@ -456,7 +488,7 @@ const App: React.FC = () => {
         eventLog: string[],
         damageReport: string,
         worldStatus: string,
-        animatedScenario: string,
+        animatedScenarioText: string,
         mpStats?: MultiplayerGameStats
     ) => {
         const isMultiplayer = !!mpStats;
@@ -522,11 +554,11 @@ const App: React.FC = () => {
                     <div className="font-mono bg-black/50 p-3 rounded h-40 overflow-y-auto text-sm text-gray-300 mb-4 flex flex-col-reverse border border-gray-700">
                         <div>{eventLog.map((event, index) => <p key={index} className={event.startsWith('>') ? 'text-cyan-400' : 'text-gray-300'}>{event}</p>)}</div>
                     </div>
-                    {isLoading ? <div className="flex-grow flex items-center justify-center text-gray-400">Đang xử lý...</div> :
+                    {isLoading && !isMultiplayer ? <div className="flex-grow flex items-center justify-center text-gray-400">Đang xử lý...</div> :
                         <div className="flex-grow flex flex-col">
                             <div className="bg-black/30 p-3 rounded-lg border border-yellow-700/50 mb-4"><h3 className="font-bold text-yellow-400 text-sm mb-1 flex items-center gap-2"><Icon name="warning" className="w-4 h-4" />THÔNG BÁO</h3><p className="text-gray-300 text-sm">{damageReport}</p></div>
                             <div className="bg-black/30 p-3 rounded-lg border border-gray-700 mb-4"><h3 className="font-bold text-gray-400 text-sm mb-1">TÌNH BÁO</h3><p className="text-gray-300 text-sm">{worldStatus}</p></div>
-                            <p className="text-green-300 mb-4 text-lg flex-grow min-h-[4.5rem]">{animatedScenario}{!animatedScenario.endsWith('.') && <span className="typing-cursor">_</span>}</p>
+                            <p className="text-green-300 mb-4 text-lg flex-grow min-h-[4.5rem]">{animatedScenarioText}{animatedScenarioText.length > 0 && !animatedScenarioText.endsWith('.') && <span className="typing-cursor">_</span>}</p>
                             <form onSubmit={e => { e.preventDefault(); isMultiplayer ? handleMpAction() : handleSpAction(); }} className="mt-auto">
                                 <div className="flex items-center gap-2 bg-black/50 border rounded-lg p-2 form-input-glow">
                                     <span className="font-mono text-cyan-400 pl-2">{'>'}</span>
@@ -557,7 +589,7 @@ const App: React.FC = () => {
             <main className="w-full max-w-7xl bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 z-10 border border-gray-700 glow-border">
                 {renderContent()}
             </main>
-            {gameMode === 'offline' && (
+            {gameMode === 'offline' && spStats && (
                 <ConferenceModal
                     isOpen={isConferenceOpen}
                     onClose={() => setIsConferenceOpen(false)}
