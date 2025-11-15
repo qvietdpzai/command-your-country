@@ -1,6 +1,7 @@
+
 import React from 'react';
 
-interface IconProps extends React.SVGProps<SVGSVGElement> {
+export interface IconProps extends React.SVGProps<SVGSVGElement> {
     name: 'military' | 'economy' | 'morale' | 'diplomacy' | 'play' | 'refresh' | 'send' | 'territory' | 'policy' | 'load' | 'warning' | 'manpower' | 'infantry' | 'armor' | 'navy' | 'airforce' | 'growth' | 'fortification' | 'oil' | 'minerals' | 'gas' | 'close' | 'army_corps' | 'conference' | 'speaking' | 'microphone';
 }
 

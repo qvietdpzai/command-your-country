@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getNextTurn, generateNationalEmblem, processMultiplayerTurn } from './services/geminiService';
 import { createGame, getGameState, joinGame, setPlayerReady, updateGameState } from './services/multiplayerService';
 import { SinglePlayerGameStats, MilitaryStats, SinglePlayerTurnResponse, WorldMap, RegionID, MultiplayerGameStats, Player } from './types';
-import { Icon } from './components/icons';
+import { Icon, IconProps } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
 import { RegionDetail } from './components/RegionDetail';
@@ -71,18 +72,18 @@ const useTypingEffect = (text: string = '', speed: number = 25): string => {
 const formatNumber = (num: number): string => new Intl.NumberFormat('en-US').format(num);
 
 // --- UI Sub-components ---
-const StatDisplay: React.FC<{ icon: any; label: string; value: string | number; unit?: string }> = ({ icon, label, value, unit }) => (
+const StatDisplay: React.FC<{ icon: IconProps['name']; label: string; value: string | number; unit?: string }> = ({ icon, label, value, unit }) => (
     <div className="flex items-center justify-between text-white bg-gray-900/50 p-2 rounded-md">
         <div className="flex items-center gap-2"><Icon name={icon} className="w-5 h-5 text-gray-400" /><span className="font-semibold text-gray-300">{label}</span></div>
         <span className="font-mono font-bold text-lg">{value} <span className="text-sm text-gray-500">{unit}</span></span>
     </div>
 );
-const MilitaryStat: React.FC<{ icon: any; value: number }> = ({ icon, value }) => (
+const MilitaryStat: React.FC<{ icon: IconProps['name']; value: number }> = ({ icon, value }) => (
     <div className="flex flex-col items-center justify-center bg-gray-900/50 p-2 rounded-md text-center">
         <Icon name={icon} className="w-7 h-7 text-gray-400 mb-1" /><span className="font-mono font-bold text-base text-white">{formatNumber(value)}</span>
     </div>
 );
-const MoraleDiplomacyBar: React.FC<{ value: number; icon: any; label: string }> = ({ value, icon, label }) => {
+const MoraleDiplomacyBar: React.FC<{ value: number; icon: IconProps['name']; label: string }> = ({ value, icon, label }) => {
     const percentage = (value / MAX_MORALE_DIPLOMACY) * 100;
     const barColor = value > 60 ? 'bg-green-500' : value > 30 ? 'bg-yellow-500' : 'bg-red-500';
     return (
