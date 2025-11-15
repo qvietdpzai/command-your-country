@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 // Fix: Replaced GameStats with SinglePlayerGameStats as GameStats is no longer exported from types.
 import { SinglePlayerGameStats, ChatMessage } from '../types';
 import { getConferenceResponse } from '../services/geminiService';
-import { Icon } from './icons';
+import { Icon, IconProps } from './icons';
 
 interface ConferenceModalProps {
     isOpen: boolean;
@@ -15,6 +15,13 @@ interface ConferenceModalProps {
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 const hasSpeechRecognition = !!SpeechRecognition;
 const hasSpeechSynthesis = 'speechSynthesis' in window;
+
+type MicButtonState = {
+    text: string;
+    disabled: boolean;
+    icon: IconProps['name'];
+    className?: string;
+}
 
 export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClose, gameStats }) => {
     const [history, setHistory] = useState<ChatMessage[]>([]);
@@ -147,11 +154,11 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
 
     if (!isOpen) return null;
 
-    const getMicButtonState = () => {
-        if (isThinking) return { text: 'AI đang suy nghĩ...', disabled: true, icon: 'load' as const, className: 'animate-spin' };
-        if (isSpeaking) return { text: 'AI đang phát biểu...', disabled: true, icon: 'speaking' as const, className: 'animate-pulse' };
-        if (isListening) return { text: 'Đang nghe...', disabled: false, icon: 'microphone' as const, className: 'animate-pulse text-red-500' };
-        return { text: 'Bắt đầu nói', disabled: false, icon: 'microphone' as const };
+    const getMicButtonState = (): MicButtonState => {
+        if (isThinking) return { text: 'AI đang suy nghĩ...', disabled: true, icon: 'load', className: 'animate-spin' };
+        if (isSpeaking) return { text: 'AI đang phát biểu...', disabled: true, icon: 'speaking', className: 'animate-pulse' };
+        if (isListening) return { text: 'Đang nghe...', disabled: false, icon: 'microphone', className: 'animate-pulse text-red-500' };
+        return { text: 'Bắt đầu nói', disabled: false, icon: 'microphone' };
     };
     const micButtonState = getMicButtonState();
 
@@ -180,7 +187,6 @@ export const ConferenceModal: React.FC<ConferenceModalProps> = ({ isOpen, onClos
                         className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-full transition-transform transform hover:scale-105 flex items-center justify-center gap-3 mx-auto"
                         title={!hasSpeechRecognition ? "Trình duyệt không hỗ trợ nhận dạng giọng nói" : ""}
                     >
-                        {/* Fix: Removed 'as any' since icon names are now correctly typed */}
                         <Icon name={micButtonState.icon} className={`w-6 h-6 ${micButtonState.className || ''}`} />
                         {micButtonState.text}
                     </button>
