@@ -70,7 +70,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, play
 
     return (
         <div className="mt-4 flex flex-col items-center">
-            <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢC TOÀN CẦU</h3>
+            <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢỢC TOÀN CẦU</h3>
             <div className="bg-gray-900/50 p-2 rounded-md w-full">
                 <svg viewBox="0 0 560 210" className="w-full h-auto">
                     <defs>
@@ -89,7 +89,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, play
                         const faction = regionState?.controlledBy || 'neutral';
                         const isContested = regionState?.isContested;
                         const player = getPlayerForId(faction);
-                        const factionName = player ? player.nationName : FACTION_NAMES[faction];
+                        const factionName = player ? player.nationName : FACTION_NAMES[faction] || 'Không xác định';
 
                         const isSelectable = selectableRegions?.includes(regionId);
                         const isSelected = selectedRegion === regionId;
@@ -102,7 +102,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, play
                             >
                                 <path
                                     d={region.path}
-                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 ${isSelectable ? 'group-hover:stroke-white' : ''} ${isSelected ? 'stroke-yellow-400' : ''} ${isContested ? 'contested-zone' : ''}`}
+                                    className={`${FACTION_COLORS[faction] || FACTION_COLORS.neutral} transition-all duration-300 ${isSelectable ? 'group-hover:stroke-white' : ''} ${isSelected ? 'stroke-yellow-400' : ''} ${isContested ? 'contested-zone' : ''}`}
                                     strokeWidth={isSelected ? "2.5" : "1.5"}
                                 />
                                 <title>{`${region.name} - ${isSelectable ? 'Có thể chọn' : `Kiểm soát bởi: ${factionName}`}`}</title>
@@ -121,11 +121,11 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, play
                         </g>
                     )}
                     {/* Multiplayer Military Icons */}
-                     {players.map(player => {
+                     {players.map((player, index) => {
                         const playerCorps = player.armyCorps || [];
                         const militaryLocations = [...new Set(playerCorps.map(c => c.location))];
                         return militaryLocations.map(locationId => {
-                             const color = FACTION_COLORS[player.id].split(' ')[0].replace('fill-', 'stroke-');
+                             const color = (FACTION_COLORS[player.id] || PLAYER_COLORS[index % PLAYER_COLORS.length]).split(' ')[0].replace('fill-', 'stroke-');
                              return (
                                 <g key={`${player.id}-${locationId}`} transform={`translate(${REGION_DATA[locationId].center[0]}, ${REGION_DATA[locationId].center[1]})`} className="pointer-events-none">
                                      <path d="M0 -8 L2 -2 H8 L4 2 L6 8 L0 4 L-6 8 L-4 2 L-8 -2 H-2 Z" 
@@ -144,7 +144,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ mapData, onRegionClick, play
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">CHÚ GIẢI BẢN ĐỒ</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-1">
                     {players.length > 0 ? (
-                        players.map(p => <LegendItem key={p.id} colorClass={FACTION_COLORS[p.id]} name={p.nationName} />)
+                        players.map(p => <LegendItem key={p.id} colorClass={FACTION_COLORS[p.id] || ''} name={p.nationName} />)
                     ) : (
                          <LegendItem colorClass={FACTION_COLORS.player} name={FACTION_NAMES.player} />
                     )}

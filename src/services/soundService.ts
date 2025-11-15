@@ -71,11 +71,15 @@ const init = async () => {
 };
 
 const playSound = (name: SoundName) => {
-    if (!isInitialized || !audioContext || !audioBuffers[name]) return;
+    if (!isInitialized || !audioContext || !audioBuffers[name]) {
+        return;
+    }
+    // Create a local constant to help TypeScript's control flow analysis
+    const safeAudioContext = audioContext;
     try {
-        const source = audioContext.createBufferSource();
+        const source = safeAudioContext.createBufferSource();
         source.buffer = audioBuffers[name]!;
-        source.connect(audioContext.destination);
+        source.connect(safeAudioContext.destination);
         source.start(0);
     } catch (e) {
         console.error(`Error playing sound: ${name}`, e);
@@ -84,6 +88,7 @@ const playSound = (name: SoundName) => {
 
 const playMusic = () => {
     if (!isInitialized || !audioContext || musicSourceNode) return;
+    const safeAudioContext = audioContext;
 
     let trackIndex;
     if (musicPlaylist.length > 1) {
@@ -99,14 +104,14 @@ const playMusic = () => {
     if (!audioBuffers[trackToPlay]) return;
 
     try {
-        const source = audioContext.createBufferSource();
+        const source = safeAudioContext.createBufferSource();
         source.buffer = audioBuffers[trackToPlay]!;
         source.loop = true;
         
-        const gainNode = audioContext.createGain();
-        gainNode.gain.setValueAtTime(0.25, audioContext.currentTime); // 25% volume
+        const gainNode = safeAudioContext.createGain();
+        gainNode.gain.setValueAtTime(0.25, safeAudioContext.currentTime); // 25% volume
         source.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(safeAudioContext.destination);
 
         source.start(0);
         musicSourceNode = source;
