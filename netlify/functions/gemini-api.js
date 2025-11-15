@@ -42,7 +42,12 @@ const spResponseSchema = {
 };
 
 const handleGetNextTurn = async (currentStats, playerAction) => {
-    const prompt = `${spSystemInstruction}\nBối cảnh trò chơi hiện tại (JSON): ${JSON.stringify(currentStats)}\nHành động của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}\nDựa trên bối cảnh và hành động trên, hãy tạo ra phản hồi JSON cho lượt đi này theo schema đã cho.`;
+    const isFirstTurn = playerAction === null || playerAction === 'Không có (lượt đầu tiên)';
+    const contextPrompt = isFirstTurn && currentStats.nationalContext 
+        ? `\n\nBối cảnh quốc gia do người chơi cung cấp: "${currentStats.nationalContext}". Hãy sử dụng bối cảnh này để định hình kịch bản, kết quả ban đầu và các chính sách khởi đầu.`
+        : '';
+    
+    const prompt = `${spSystemInstruction}${contextPrompt}\nBối cảnh trò chơi hiện tại (JSON): ${JSON.stringify(currentStats)}\nHành động của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}\nDựa trên bối cảnh và hành động trên, hãy tạo ra phản hồi JSON cho lượt đi này theo schema đã cho.`;
     const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: "application/json", responseSchema: spResponseSchema, temperature: 0.8 } });
     if (!response || !response.text) throw new Error("AI model failed to generate a response.");
     return JSON.parse(response.text.trim());
@@ -95,7 +100,7 @@ const handleProcessMultiplayerTurn = async (currentStats, playerAction) => {
         contents: prompt,
         config: { responseMimeType: "application/json", temperature: 0.7 }
     });
-    if (!response || !response.text) throw new Error("AI model failed to generate a multiplayer response.");
+    if (!response || !response.text) throw new Error("AI model failed to a multiplayer response.");
     const jsonText = response.text.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
     return JSON.parse(jsonText);
 };
@@ -103,12 +108,17 @@ const handleProcessMultiplayerTurn = async (currentStats, playerAction) => {
 
 // --- SHARED & HANDLER ---
 const handleGenerateNationalEmblem = async (nationName) => {
-    const prompt = `Quốc huy cho một quốc gia tên là '${nationName}'. Phong cách biểu tượng, mạnh mẽ, huy hiệu, dạng tròn, nghệ thuật vector, trên nền đen.`;
-    const response = await ai.models.generateImages({ model: 'imagen-4.0-generate-001', prompt, config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '1:1' } });
-    if (response.generatedImages && response.generatedImages.length > 0) {
-        return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
+    try {
+        const prompt = `Quốc huy cho một quốc gia tên là '${nationName}'. Phong cách biểu tượng, mạnh mẽ, huy hiệu, dạng tròn, nghệ thuật vector, trên nền đen.`;
+        const response = await ai.models.generateImages({ model: 'imagen-4.0-generate-001', prompt, config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '1:1' } });
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
+        }
+        return null;
+    } catch (e) {
+        console.error("Error during emblem generation API call:", e);
+        return null; // Return null on failure instead of crashing the function
     }
-    return null;
 };
 
 exports.handler = async function(event) {

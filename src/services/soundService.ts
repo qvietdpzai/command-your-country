@@ -1,4 +1,5 @@
 
+
 // Define sound types
 export type SoundName =
     | 'ui_click'
@@ -13,21 +14,22 @@ export type SoundName =
     | 'background_music_2'
     | 'background_music_3';
 
-// Store audio data as base64 to keep it self-contained
-// Using short, valid WAV files for all sounds to ensure functionality.
+// Use a single, valid, minimal WAV file for all sounds to prevent decoding errors.
+// This ensures the app doesn't crash, even if sounds are repetitive placeholders.
+const validTinyWav = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
 const sounds: Record<SoundName, string> = {
-    ui_click: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA',
-    start_game: 'data:audio/wav;base64,UklGRlAAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhUAAAAH6Ag4SKhYOEg4B+fHx6eXh2dnRzcXBvbm1sbWpqaWhnZ2ZlZmRjZGFgX15dW1tZWFhXVlVUVFNSUU9OTUxLSklIR0ZFRENCQUA/Pjw7Ojk4NzY1NDMyMTAwLy4tLCsmJSQlIiEgICAfHh0cHBsaGRgXFhUUExMRCw==',
-    send_command: 'data:audio/wav;base64,UklGRiIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhPAAAAP////8AAP////8AAP////8AAP////8AAP////8AAP////8AAP////8AAP////8AAP////8AAP////8AAP////8A',
-    receive_response: 'data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhVwAAAP9/AIAAAQGCAAEBBwD/f/5//f/6//f/8//r/+f/5//n/+f/6P/q/+r/7P/u/+7/7//w//H/9P/1/Pb/9v/3//j/+f/7//z//P/9//4//v/+AAAAAA==',
-    stat_increase: 'data:audio/wav;base64,UklGRlAAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhUAAAAH6Ag4SKhYOEg4B+fHx6eXh2dnRzcXBvbm1sbWpqaWhnZ2ZlZmRjZGFgX15dW1tZWFhXVlVUVFNSUU9OTUxLSklIR0ZFRENCQUA/Pjw7Ojk4NzY1NDMyMTAwLy4tLCsmJSQlIiEgICAfHh0cHBsaGRgXFhUUExMRCw==',
-    stat_decrease: 'data:audio/wav;base64,UklGRkIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhWAAAAAsPERMWFxsZGhscHR4gISIjJCUmKCkqKywtLzEyMzQ1Njc5Ojs8PT5AQUJERUZISUpMTU5QUVJTVFVWV1hZWltcXV5gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXt8fX5/gYKEhYaHiImKi4yNjo+QkZKTlJWWl5iamps=',
-    game_over: 'data:audio/wav;base64,UklGRlYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhTAAAAMrKzM7P0NLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=',
-    text_typing: 'data:audio/wav;base64,UklGRkYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhBgAAAP8/vw==',
-    // Placeholder silent audio for music to avoid large base64 strings
-    background_music: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA',
-    background_music_2: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA',
-    background_music_3: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+    ui_click: validTinyWav,
+    start_game: validTinyWav,
+    send_command: validTinyWav,
+    receive_response: validTinyWav,
+    stat_increase: validTinyWav,
+    stat_decrease: validTinyWav,
+    game_over: validTinyWav,
+    text_typing: validTinyWav,
+    background_music: validTinyWav,
+    background_music_2: validTinyWav,
+    background_music_3: validTinyWav
 };
 
 let audioContext: AudioContext | null = null;

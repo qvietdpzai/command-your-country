@@ -112,7 +112,17 @@ const App: React.FC = () => {
     const [mpJoinId, setMpJoinId] = useState('');
     const pollingTimeoutRef = useRef<number | null>(null);
 
+    // Typing effects - Moved to top level to obey Rules of Hooks
     const animatedScenario = useTypingEffect(isLoading ? '' : (spTurnData?.scenario || ''));
+    const [mpLogText, setMpLogText] = useState('');
+    const animatedMpLog = useTypingEffect(isLoading ? '' : mpLogText);
+
+    useEffect(() => {
+        if (gameMode === 'online' && mpGameState === 'playing' && mpGameStats) {
+            const latestLog = mpGameStats.gameLog.length > 0 ? mpGameStats.gameLog[0] : "Trận đấu bắt đầu.";
+            setMpLogText(latestLog);
+        }
+    }, [isLoading, mpGameStats, gameMode, mpGameState]);
 
     // --- Sound Management ---
     const initializeAudio = useCallback(() => {
@@ -123,34 +133,54 @@ const App: React.FC = () => {
     }, []);
     const playSoundWithInit = useCallback((sound: SoundName) => { initializeAudio(); soundService.playSound(sound); }, [initializeAudio]);
 
-    // --- Single-Player Logic ---
+    // --- Single-Player Logic with Safe LocalStorage ---
     useEffect(() => {
-        const savedGame = localStorage.getItem(SINGLE_PLAYER_SAVE_KEY);
-        setHasSaveGame(!!savedGame);
+        try {
+            const savedGame = localStorage.getItem(SINGLE_PLAYER_SAVE_KEY);
+            setHasSaveGame(!!savedGame);
+        } catch (e) {
+            console.warn("Could not access localStorage:", e);
+            setHasSaveGame(false);
+        }
     }, []);
 
     const saveSpGame = (stats: SinglePlayerGameStats, turnData: SinglePlayerTurnResponse, eventLog: string[]) => {
-        localStorage.setItem(SINGLE_PLAYER_SAVE_KEY, JSON.stringify({ stats, turnData, eventLog }));
-        setHasSaveGame(true);
+        try {
+            localStorage.setItem(SINGLE_PLAYER_SAVE_KEY, JSON.stringify({ stats, turnData, eventLog }));
+            setHasSaveGame(true);
+        } catch (e) {
+            console.warn("Could not save game to localStorage:", e);
+        }
     };
 
-    const clearSpSaveGame = () => { localStorage.removeItem(SINGLE_PLAYER_SAVE_KEY); setHasSaveGame(false); };
+    const clearSpSaveGame = () => {
+        try {
+            localStorage.removeItem(SINGLE_PLAYER_SAVE_KEY);
+            setHasSaveGame(false);
+        } catch (e) {
+            console.warn("Could not clear saved game from localStorage:", e);
+        }
+    };
 
     const loadSpGame = () => {
         playSoundWithInit('ui_click');
-        const savedGameString = localStorage.getItem(SINGLE_PLAYER_SAVE_KEY);
-        if (savedGameString) {
-            try {
+        try {
+            const savedGameString = localStorage.getItem(SINGLE_PLAYER_SAVE_KEY);
+            if (savedGameString) {
                 const savedGame = JSON.parse(savedGameString);
                 setSpStats(savedGame.stats);
                 setSpTurnData(savedGame.turnData);
                 setSpEventLog(savedGame.eventLog);
                 setSpGameState('playing');
                 setGameMode('offline');
-            } catch { clearSpSaveGame(); alert("Lỗi dữ liệu lưu, bắt đầu chiến dịch mới."); }
+            }
+        } catch (e) {
+            console.warn("Could not load game from localStorage:", e);
+            clearSpSaveGame();
+            alert("Lỗi dữ liệu lưu, bắt đầu chiến dịch mới.");
         }
     };
-
+    
     const handleSpNationCreation = useCallback(async () => {
         if (!tempNationName.trim() || isLoading) return;
         playSoundWithInit('start_game');
@@ -405,9 +435,7 @@ const App: React.FC = () => {
                 const isMyTurn = mpGameStats.activePlayerId === mpPlayerId;
                 const opponentPlayer = mpGameStats.players.find(p => p.id !== mpPlayerId);
                 const gameLog = mpGameStats.gameLog || [];
-                const latestLog = gameLog.length > 0 ? gameLog[0] : "Trận đấu bắt đầu.";
-                const animatedLog = useTypingEffect(isLoading ? '' : latestLog);
-                return renderPlayingUI(mePlayer, gameLog, isMyTurn ? "Đến lượt của bạn." : `Đang chờ ${opponentPlayer?.nationName || 'đối thủ'}...`, `Lượt ${mpGameStats.turn}`, animatedLog, mpGameStats);
+                return renderPlayingUI(mePlayer, gameLog, isMyTurn ? "Đến lượt của bạn." : `Đang chờ ${opponentPlayer?.nationName || 'đối thủ'}...`, `Lượt ${mpGameStats.turn}`, animatedMpLog, mpGameStats);
             case 'gameOver': 
                  const winner = mpGameStats?.players.find(p => p.id === mpGameStats?.winnerId);
                  const message = winner?.id === mpPlayerId ? `Chúc mừng! Bạn đã chiến thắng!` : `Thất bại. ${winner?.nationName} đã giành chiến thắng.`;
