@@ -1,157 +1,258 @@
+
 const { GoogleGenAI } = require("@google/genai");
 
 const apiKey = process.env.API_KEY || process.env.API_key;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// --- SINGLE PLAYER LOGIC ---
-const spSystemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược theo lượt có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả, phản ứng với hành động của người chơi.
+const systemInstruction = `Bạn là một AI quản trò cho một trò chơi chiến lược văn bản có tên 'WW3: Xung đột toàn cầu'. Bối cảnh là một thế giới đang trên bờ vực chiến tranh. Vai trò của bạn là tạo ra một môi trường thù địch, thực tế và có tính nhân quả.
+
+HỆ THỐNG QUÂN ĐOÀN:
+-   Quân đội của người chơi được chia thành các Quân đoàn ('ArmyCorps'). Mỗi quân đoàn là một thực thể riêng biệt có ID, tên, vị trí và thành phần quân sự.
+-   Người chơi có thể ra lệnh tạo, di chuyển, tấn công, chia tách hoặc sáp nhập các quân đoàn.
+-   Tạo quân đoàn mới sẽ trừ vào 'manpower' (nhân lực) và 'economy' (kinh tế) của người chơi.
+-   Khi một quân đoàn di chuyển, hãy cập nhật thuộc tính 'location' của nó.
+-   Khi một quân đoàn bị tiêu diệt, hãy xóa nó khỏi danh sách.
+-   Tất cả các thay đổi về quân đoàn (tạo, cập nhật, xóa) phải được trả về trong 'armyCorpsChanges'.
+-   ID của quân đoàn mới phải là duy nhất, ví dụ: 'corps-' + một con số tăng dần hoặc một chuỗi ngẫu nhiên.
+
+HỆ THỐNG BẢN ĐỒ VÀ CHIẾN ĐẤU:
+-   Bản đồ được chia thành các khu vực, mỗi khu vực có công sự ('fortificationLevel'), tài nguyên ('strategicResource'), quân đồn trú của NPC ('militaryPresence'), và có thể bị tranh chấp ('isContested').
+-   **CHIẾN ĐẤU:** Khi người chơi ra lệnh tấn công bằng một quân đoàn cụ thể (ví dụ: "Dùng Quân đoàn 1 tấn công Tây Âu"), hãy so sánh sức mạnh của quân đoàn đó với quân đồn trú và công sự của khu vực phòng thủ.
+    -   Tính toán tổn thất cho cả hai bên.
+    -   Phản ánh tổn thất của người chơi bằng cách cập nhật thành phần của quân đoàn tấn công trong 'armyCorpsChanges'.
+    -   Phản ánh tổn thất của NPC bằng cách cập nhật 'militaryPresence' của khu vực trong 'mapChanges'.
+    -   Nếu người chơi thắng, hãy cập nhật 'newController' của khu vực thành phe của người chơi và giảm mạnh hoặc xóa sổ quân đồn trú của NPC.
+-   Các khu vực do NPC kiểm soát có thể tự xây dựng quân đội theo thời gian. Hãy phản ánh điều này trong 'worldStatus' và cập nhật 'militaryPresence'.
 
 QUY TẮC CỐT LÕI VỀ TẤN CÔNG:
-1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC (Liên minh Đông/Tây) chỉ có thể xảy ra nếu có lý do chính đáng.
+1.  KHÔNG được tấn công người chơi một cách ngẫu nhiên. Một cuộc tấn công của NPC chỉ có thể xảy ra nếu có lý do chính đáng.
 2.  Lý do hợp lệ bao gồm: (A) Phản ứng lại hành động gây hấn của người chơi. (B) Người chơi có chỉ số Ngoại giao cực kỳ thấp. (C) Người chơi để lộ điểm yếu quân sự hoặc kinh tế. (D) Căng thẳng thế giới leo thang.
-3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:', nêu rõ lý do VÀ khu vực bị ảnh hưởng. Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
-
-HỆ THỐNG BẢN ĐỒ VÀ QUÂN SỰ:
--   Bản đồ được chia thành các khu vực. Mỗi khu vực do một phe kiểm soát ('controlledBy').
--   Sự hiện diện quân sự của người chơi trong một khu vực được biểu thị bằng 'hasPlayerMilitary'. Người chơi chỉ có thể có quân ở MỘT khu vực tại một thời điểm.
--   **TẤN CÔNG:** Khi người chơi ra lệnh tấn công một khu vực, hãy so sánh tổng sức mạnh quân sự của họ với phe phòng thủ. Sức mạnh của NPC do bạn quyết định. Tính toán tổn thất cho cả hai bên. Phản ánh tổn thất của người chơi trong 'statChanges.military'. Nếu người chơi thắng, hãy cập nhật 'newController' của khu vực thành 'player' và di chuyển quân của họ đến đó (đặt 'playerMilitary: true' cho khu vực mới trong mapChanges).
--   **DI CHUYỂN:** Khi người chơi di chuyển quân đội đến một khu vực họ đã kiểm soát, hãy cập nhật 'hasPlayerMilitary' trong 'mapChanges' để phản ánh vị trí mới.
+3.  Khi một cuộc tấn công xảy ra, Báo cáo Thiệt hại (damageReport) PHẢI bắt đầu bằng tiền tố 'Báo động đỏ:', nêu rõ lý do VÀ khu vực bị ảnh hưởng. Nếu quân đoàn của người chơi bị tấn công, hãy chỉ rõ quân đoàn nào. Ví dụ: 'Báo động đỏ: Do các cuộc tập trận khiêu khích của bạn, Liên minh Phương Đông đã không kích vào Quân đoàn 1 ở Đông Âu, phá hủy 25 máy bay và 50 xe tăng.' Nếu không có tấn công, hãy ghi 'Không có thiệt hại nào được báo cáo.'
 
 CÁC QUY TẮC KHÁC:
--   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.
--   'scenario' mô tả tình hình mới mà người chơi phải đối mặt.
-`;
+-   **THẾ GIỚI SỐNG ĐỘNG:** Các quốc gia NPC có thể tương tác, gây chiến với nhau. Hãy báo cáo những sự kiện này trong 'worldStatus' và cập nhật bản đồ.
+-   Khi bắt đầu một trò chơi mới, hãy phân bổ ngẫu nhiên tài nguyên và công sự. Đặt một số quân đồn trú ban đầu cho các phe NPC. Biến Trung Đông thành khu vực tranh chấp.
+-   Luôn trả lời bằng định dạng JSON hợp lệ. Các kịch bản và kết quả phải ngắn gọn, kịch tính và bằng tiếng Việt.`;
 
-const spResponseSchema = {
+const responseSchema = {
     type: 'OBJECT',
     properties: {
-        outcome: { type: 'STRING', description: 'Mô tả ngắn gọn kết quả từ hành động của người chơi.' },
-        scenario: { type: 'STRING', description: 'Mô tả kịch bản hoặc tình huống mới mà người chơi sẽ đối mặt.' },
-        statChanges: {
-            type: 'OBJECT', properties: {
-                military: { type: 'OBJECT', properties: { infantry: { type: 'INTEGER' }, armor: { type: 'INTEGER' }, navy: { type: 'INTEGER' }, airforce: { type: 'INTEGER' }}},
-                economy: { type: 'INTEGER' }, manpower: { type: 'INTEGER' }, morale: { type: 'INTEGER' },
-                diplomacy: { type: 'INTEGER' }, economicGrowth: { type: 'NUMBER' },
-                mapChanges: { type: 'ARRAY', items: { type: 'OBJECT', properties: { region: { type: 'STRING' }, newController: { type: 'STRING' }, playerMilitary: { type: 'BOOLEAN' } }, required: ['region'] } }
-            }
+        outcome: { 
+            type: 'STRING', 
+            description: 'Mô tả ngắn gọn kết quả từ hành động trước đó của người chơi. Nếu đây là lượt đầu tiên, hãy viết "Trò chơi bắt đầu. Tình hình toàn cầu căng thẳng.".' 
         },
-        policySummary: { type: 'STRING', description: 'Tóm tắt hành động của người chơi thành một chính sách ngắn gọn.' },
-        worldStatus: { type: 'STRING', description: 'Một hoặc hai câu mô tả tình hình địa chính trị toàn cầu hiện tại.' },
-        damageReport: { type: 'STRING', description: "Mô tả thiệt hại mà người chơi phải gánh chịu." },
+        scenario: { 
+            type: 'STRING', 
+            description: 'Mô tả kịch bản hoặc tình huống mới mà người chơi phải đối mặt.' 
+        },
+        statChanges: {
+            type: 'OBJECT',
+            properties: {
+                armyCorpsChanges: {
+                    type: 'ARRAY',
+                    description: "Danh sách các thay đổi đối với quân đoàn của người chơi.",
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            action: { type: 'STRING', description: "Hành động: 'CREATE', 'UPDATE', hoặc 'DELETE'." },
+                            corps: {
+                                type: 'OBJECT',
+                                properties: {
+                                    id: { type: 'STRING', description: "ID duy nhất của quân đoàn." },
+                                    name: { type: 'STRING', description: "Tên của quân đoàn." },
+                                    location: { type: 'STRING', description: "ID khu vực nơi quân đoàn đóng quân." },
+                                    composition: {
+                                        type: 'OBJECT',
+                                        properties: {
+                                            infantry: { type: 'INTEGER' },
+                                            armor: { type: 'INTEGER' },
+                                            navy: { type: 'INTEGER' },
+                                            airforce: { type: 'INTEGER' },
+                                        }
+                                    }
+                                },
+                                required: ['id']
+                            }
+                        },
+                        required: ['action', 'corps']
+                    }
+                },
+                economy: { type: 'INTEGER', description: 'Thay đổi chỉ số kinh tế (tính bằng Tỷ USD).' },
+                manpower: { type: 'INTEGER', description: 'Thay đổi chỉ số nhân lực.' },
+                morale: { type: 'INTEGER', description: 'Thay đổi chỉ số tinh thần (thang 0-100).' },
+                diplomacy: { type: 'INTEGER', description: 'Thay đổi chỉ số ngoại giao (thang 0-100).' },
+                economicGrowth: { type: 'NUMBER', description: 'Thay đổi tỷ lệ tăng trưởng kinh tế (%). Ví dụ: 0.1, -0.2.' },
+                mapChanges: {
+                    type: 'ARRAY',
+                    description: "Danh sách các thay đổi trên bản đồ thế giới. Chỉ bao gồm các khu vực bị ảnh hưởng.",
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            region: { type: 'STRING', description: "ID của khu vực bị thay đổi (ví dụ: 'western_europe')." },
+                            newController: { type: 'STRING', description: "Phe kiểm soát mới (ví dụ: 'player', 'player_alliance')." },
+                            militaryPresence: {
+                                type: 'OBJECT',
+                                description: "Số lượng quân đồn trú mới trong khu vực sau các sự kiện.",
+                                properties: {
+                                    infantry: { type: 'INTEGER' },
+                                    armor: { type: 'INTEGER' },
+                                    navy: { type: 'INTEGER' },
+                                    airforce: { type: 'INTEGER' },
+                                }
+                            },
+                            fortificationLevel: { type: 'INTEGER', description: "Cấp độ công sự mới của khu vực (1-5)." },
+                            isContested: { type: 'BOOLEAN', description: "Khu vực có đang bị tranh chấp hay không." }
+                        },
+                        required: ['region']
+                    }
+                }
+            },
+            required: ['armyCorpsChanges', 'economy', 'manpower', 'morale', 'diplomacy', 'economicGrowth', 'mapChanges']
+        },
+        policySummary: {
+            type: 'STRING',
+            description: 'Tóm tắt hành động của người chơi thành một chính sách hoặc học thuyết ngắn gọn. Nếu là lượt đầu tiên, trả về "Khởi đầu Kỷ nguyên Mới".'
+        },
+        worldStatus: {
+            type: 'STRING',
+            description: 'Một hoặc hai câu mô tả tình hình địa chính trị toàn cầu hiện tại.'
+        },
+        damageReport: {
+            type: 'STRING',
+            description: "Mô tả ngắn gọn về thiệt hại mà quốc gia của bạn phải gánh chịu. PHẢI tuân thủ QUY TẮC CỐT LÕI VỀ TẤN CÔNG."
+        },
+        allianceName: { 
+            type: 'STRING', 
+            description: "Tên liên minh của người chơi, nếu nó được tạo hoặc thay đổi trong lượt này. Nếu không, hãy bỏ qua." 
+        },
     },
+    required: ['outcome', 'scenario', 'statChanges', 'policySummary', 'worldStatus', 'damageReport']
 };
 
 const handleGetNextTurn = async (currentStats, playerAction) => {
-    const isFirstTurn = playerAction === null || playerAction === 'Không có (lượt đầu tiên)';
-    const contextPrompt = isFirstTurn && currentStats.nationalContext 
-        ? `\n\nBối cảnh quốc gia do người chơi cung cấp: "${currentStats.nationalContext}". Hãy sử dụng bối cảnh này để định hình kịch bản, kết quả ban đầu và các chính sách khởi đầu.`
-        : '';
-    
-    const prompt = `${spSystemInstruction}${contextPrompt}\nBối cảnh trò chơi hiện tại (JSON): ${JSON.stringify(currentStats)}\nHành động của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}\nDựa trên bối cảnh và hành động trên, hãy tạo ra phản hồi JSON cho lượt đi này theo schema đã cho.`;
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: "application/json", responseSchema: spResponseSchema, temperature: 0.8, thinkingConfig: { thinkingBudget: 0 } } });
-    if (!response || !response.text) throw new Error("AI model failed to generate a response.");
-    return JSON.parse(response.text.trim());
-};
+    // This is the key change: Handle the old 'military' structure and convert it
+    // to the new 'armyCorps' structure for the AI model, ensuring backward compatibility.
+    const statsForPrompt = JSON.parse(JSON.stringify(currentStats));
 
-// --- CONFERENCE LOGIC ---
-const conferenceSystemInstruction = `Bạn là một hội đồng cố vấn chiến lược AI cho Tổng tư lệnh (người chơi) của một quốc gia trong WW3. Bạn bao gồm ba thành viên:
-- **Tướng quân Strategos (Quân sự):** Giọng điệu quyết đoán, thực dụng. Tập trung vào sức mạnh quân sự, chiến thuật, phòng thủ và tấn công.
-- **Bộ trưởng Economos (Kinh tế):** Giọng điệu thận trọng, dựa trên dữ liệu. Tập trung vào kinh tế, tăng trưởng, tài nguyên và hậu cần.
-- **Nhà ngoại giao Diplomatica (Ngoại giao):** Giọng điệu khôn khéo, tinh tế. Tập trung vào quan hệ quốc tế, tinh thần dân chúng và các phe phái.
-
-Khi người chơi hỏi, hãy trả lời với tư cách là hội đồng, tổng hợp quan điểm của các thành viên. Bắt đầu câu trả lời của bạn bằng cách xác định (các) cố vấn đang phát biểu (ví dụ: "Tướng quân Strategos: ...", "Bộ trưởng Economos và tôi, Diplomatica, đồng ý rằng..."). Phân tích trạng thái trò chơi hiện tại được cung cấp và lịch sử trò chuyện để đưa ra lời khuyên phù hợp, sâu sắc và mang tính chiến lược. Giữ cho các câu trả lời tương đối ngắn gọn và đi thẳng vào vấn đề.`;
-
-const handleGetConferenceResponse = async (currentStats, history, playerAction) => {
-    let prompt = `${conferenceSystemInstruction}\n\nLỊCH SỬ HỘI THOẠI:\n`;
-    history.forEach(msg => {
-        prompt += `${msg.role === 'user' ? 'Tổng tư lệnh' : 'Hội đồng'}: ${msg.text}\n`;
-    });
-    prompt += `\nTRẠNG THÁI TRÒ CHƠI HIỆN TẠI: ${JSON.stringify(currentStats)}\n\nYÊU CẦU MỚI CỦA TỔNG TƯ LỆNH: ${playerAction}\n\nHãy trả lời với tư cách hội đồng.`;
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-            thinkingConfig: { thinkingBudget: 0 }
-        }
-    });
-
-    if (!response || !response.text) {
-        throw new Error("AI model failed to generate a conference response.");
+    if (!statsForPrompt.armyCorps && statsForPrompt.military) {
+        statsForPrompt.armyCorps = [{
+            id: 'corps-1',
+            name: 'Quân đoàn 1',
+            location: Object.keys(statsForPrompt.worldMap).find(r => statsForPrompt.worldMap[r].controlledBy === 'player') || 'north_america',
+            composition: statsForPrompt.military,
+        }];
+        delete statsForPrompt.military;
     }
     
-    return { responseText: response.text.trim() };
-};
+    const prompt = `
+        ${systemInstruction}
 
-// --- MULTIPLAYER LOGIC ---
-const mpSystemInstruction = `Bạn là AI quản trò cho một trò chơi chiến lược nhiều người chơi có tên 'WW3: Xung đột toàn cầu'. Vai trò của bạn là cập nhật trạng thái trò chơi dựa trên hành động của người chơi đang hoạt động.
+        Trạng thái hiện tại:
+        - Quốc gia: ${statsForPrompt.nationName}
+        - Liên minh: ${statsForPrompt.allianceName || 'Chưa có'}
+        - Kinh tế: ${statsForPrompt.economy} Tỷ USD
+        - Nhân lực: ${statsForPrompt.manpower}
+        - Các quân đoàn (JSON): ${JSON.stringify(statsForPrompt.armyCorps || [])}
+        - Tinh thần: ${statsForPrompt.morale}/100
+        - Ngoại giao: ${statsForPrompt.diplomacy}/100
+        - Tăng trưởng Kinh tế: ${statsForPrompt.economicGrowth}%
+        - Bản đồ thế giới (JSON): ${JSON.stringify(statsForPrompt.worldMap)}
 
-QUY TẮC:
-1.  **Hành động của người chơi:** Phân tích hành động của 'activePlayerId'. Tính toán kết quả và cập nhật chỉ số của họ (kinh tế, quân sự, v.v.).
-2.  **Tương tác:** Hành động có thể ảnh hưởng đến những người chơi khác hoặc các phe phái NPC. Ví dụ, một cuộc tấn công vào lãnh thổ của người chơi khác sẽ gây ra tổn thất cho cả hai bên.
-3.  **Cập nhật Bản đồ:** Thay đổi quyền kiểm soát lãnh thổ ('controlledBy') nếu một cuộc tấn công thành công.
-4.  **Chuyển lượt:** Sau khi xử lý xong, cập nhật 'activePlayerId' cho người chơi tiếp theo trong mảng 'players'. Tăng số 'turn'.
-5.  **Nhật ký trò chơi:** Thêm một mục vào 'gameLog' để mô tả ngắn gọn kết quả của lượt đi. Mục này sẽ được hiển thị cho tất cả người chơi.
-6.  **Điều kiện thắng/thua:** Nếu một người chơi mất hết lãnh thổ, họ sẽ thua. Nếu chỉ còn một người chơi có lãnh thổ, hãy đặt 'isGameOver' thành true và 'winnerId' là ID của người đó.
-7.  **Phản hồi:** Luôn trả về toàn bộ đối tượng trạng thái trò chơi (MultiplayerGameStats) đã được cập nhật.
-`;
+        Hành động cuối cùng của người chơi: ${playerAction || 'Không có (lượt đầu tiên)'}
 
-const handleProcessMultiplayerTurn = async (currentStats, playerAction) => {
-    const prompt = `${mpSystemInstruction}\n\nTrạng thái trò chơi hiện tại:\n${JSON.stringify(currentStats, null, 2)}\n\nHành động của người chơi '${currentStats.activePlayerId}': "${playerAction}"\n\nDựa vào các quy tắc, hãy xử lý lượt đi và trả về TOÀN BỘ đối tượng JSON trạng thái trò chơi đã được cập nhật. Đảm bảo JSON trả về là hợp lệ.`;
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { responseMimeType: "application/json", temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } }
-    });
-    if (!response || !response.text) throw new Error("AI model failed to a multiplayer response.");
-    const jsonText = response.text.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    return JSON.parse(jsonText);
-};
-
-
-// --- SHARED & HANDLER ---
-const handleGenerateNationalEmblem = async (nationName) => {
+        Dựa trên trạng thái và hành động trên, hãy tạo ra phản hồi JSON theo schema đã cho.
+    `;
+    
     try {
-        const prompt = `Quốc huy cho một quốc gia tên là '${nationName}'. Phong cách biểu tượng, mạnh mẽ, huy hiệu, dạng tròn, nghệ thuật vector, trên nền đen.`;
-        const response = await ai.models.generateImages({ model: 'imagen-4.0-generate-001', prompt, config: { numberOfImages: 1, outputMimeType: 'image/png', aspectRatio: '1:1' } });
-        if (response.generatedImages && response.generatedImages.length > 0) {
-            return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema,
+                temperature: 0.8,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
+        });
+
+        if (!response || !response.text) {
+            console.error("Gemini API returned an empty response.", { response });
+            throw new Error("AI model failed to generate a response.");
         }
-        return null;
-    } catch (e) {
-        console.error("Error during emblem generation API call:", e);
-        return null; // Return null on failure instead of crashing the function
+        
+        const jsonText = response.text.trim();
+        const cleanedJsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+
+        try {
+            return JSON.parse(cleanedJsonText);
+        } catch (parseError) {
+            console.error("Failed to parse JSON from Gemini API response:", parseError);
+            console.error("Invalid JSON received:", cleanedJsonText);
+            throw new Error("AI model returned an invalid data format.");
+        }
+
+    } catch (apiError) {
+        console.error("Error calling Gemini API in handleGetNextTurn:", apiError);
+        throw new Error(apiError.message || "An unexpected error occurred with the AI model.");
     }
 };
 
-exports.handler = async function(event) {
-    if (!ai) return { statusCode: 500, body: JSON.stringify({ message: "Lỗi cấu hình máy chủ: Thiếu khóa API Google Gemini." }) };
-    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+const handleGenerateNationalEmblem = async (nationName) => {
+    const prompt = `Quốc huy cho một quốc gia tên là '${nationName}'. Phong cách biểu tượng, mạnh mẽ, huy hiệu, dạng tròn, nghệ thuật vector, trên nền đen.`;
+    const response = await ai.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: prompt,
+        config: {
+            numberOfImages: 1,
+            outputMimeType: 'image/png',
+            aspectRatio: '1:1',
+        },
+    });
+
+    if (response.generatedImages && response.generatedImages.length > 0) {
+        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+        return `data:image/png;base64,${base64ImageBytes}`;
+    }
+    return null;
+};
+
+exports.handler = async function(event, context) {
+    if (!ai) {
+        const errorMessage = "Server configuration error: The API key is missing or invalid. Please check the API_KEY environment variable in Netlify settings.";
+        console.error(errorMessage);
+        return { statusCode: 500, body: JSON.stringify({ message: errorMessage }) };
+    }
+
+    if (event.httpMethod !== 'POST') {
+        return { statusCode: 405, body: 'Method Not Allowed' };
+    }
 
     try {
         const { action, payload } = JSON.parse(event.body);
         let responseData;
 
-        switch (action) {
-            case 'getNextTurn':
-                responseData = await handleGetNextTurn(payload.currentStats, payload.playerAction);
-                break;
-            case 'processMultiplayerTurn':
-                 responseData = await handleProcessMultiplayerTurn(payload.currentStats, payload.playerAction);
-                break;
-            case 'generateNationalEmblem':
-                responseData = { imageUrl: await handleGenerateNationalEmblem(payload.nationName) };
-                break;
-            case 'getConferenceResponse':
-                responseData = await handleGetConferenceResponse(payload.currentStats, payload.history, payload.playerAction);
-                break;
-            default:
-                return { statusCode: 400, body: JSON.stringify({ message: "Invalid action." }) };
+        if (action === 'getNextTurn') {
+            const { currentStats, playerAction } = payload;
+            responseData = await handleGetNextTurn(currentStats, playerAction);
+        } else if (action === 'generateNationalEmblem') {
+            const { nationName } = payload;
+            const imageUrl = await handleGenerateNationalEmblem(nationName);
+            responseData = { imageUrl };
+        } else {
+            return { statusCode: 400, body: JSON.stringify({ message: "Invalid action specified." }) };
         }
 
-        return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(responseData) };
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(responseData),
+        };
+
     } catch (error) {
         console.error("Error in Netlify function:", error);
-        return { statusCode: 500, body: JSON.stringify({ message: "An internal error occurred.", details: error.message }) };
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ message: "An internal error occurred.", details: error.message }),
+        };
     }
 };

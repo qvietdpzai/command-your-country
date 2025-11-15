@@ -13,6 +13,7 @@ const ForceStat: React.FC<{ icon: 'infantry' | 'armor' | 'navy' | 'airforce'; va
 
 const FACTION_NAMES: Record<FactionID, string> = {
     player: 'Quốc gia của bạn',
+    player_alliance: 'Liên minh của bạn',
     eastern_alliance: 'Liên minh Phương Đông',
     western_alliance: 'Liên minh Phương Tây',
     neutral: 'Trung lập'
@@ -54,6 +55,9 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
     const controllingFaction = regionState.controlledBy;
     
     const playerCorpsInRegion = playerArmyCorps.filter(corps => corps.location === selectedRegion);
+    const defenderForces = regionState.militaryPresence || {};
+
+    const hasDefenderForces = Object.values(defenderForces).some(val => typeof val === 'number' && val > 0);
 
     return (
         <div className="bg-black/40 p-4 rounded-lg border border-gray-700 animate-fade-in">
@@ -107,6 +111,20 @@ export const RegionDetail: React.FC<RegionDetailProps> = ({ selectedRegion, mapD
                         ))
                     ) : (
                         <p className="text-gray-500 italic text-sm mt-2">Chưa triển khai tại đây</p>
+                    )}
+                </div>
+
+                <div>
+                    <h4 className="font-bold text-red-400 mb-2 border-b border-red-400/30 pb-1">Lực lượng phòng thủ</h4>
+                    {hasDefenderForces ? (
+                        <div className="space-y-1 mt-2 pl-4">
+                            <ForceStat icon="infantry" value={defenderForces.infantry} />
+                            <ForceStat icon="armor" value={defenderForces.armor} />
+                            <ForceStat icon="navy" value={defenderForces.navy} />
+                            <ForceStat icon="airforce" value={defenderForces.airforce} />
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 italic text-sm mt-2">Không có hoặc không xác định</p>
                     )}
                 </div>
             </div>

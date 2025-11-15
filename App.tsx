@@ -4,7 +4,6 @@ import { GameStats, MilitaryStats, TurnResponse, WorldMap, RegionID } from './ty
 import { Icon } from './components/icons';
 import { WorldMap as WorldMapComponent } from './components/WorldMap';
 import { NationalEmblem } from './components/NationalEmblem';
-import { GameSetup } from './components/GameSetup';
 import { soundService, SoundName } from './services/soundService';
 
 const REGIONS: RegionID[] = ['north_america', 'south_america', 'western_europe', 'eastern_europe', 'middle_east', 'north_africa', 'sub_saharan_africa', 'central_asia', 'east_asia', 'south_asia', 'southeast_asia', 'oceania'];
@@ -14,25 +13,30 @@ const createInitialMap = (): WorldMap => {
     REGIONS.forEach(region => {
         map[region] = { controlledBy: 'neutral', hasPlayerMilitary: false };
     });
-    // Assign starting territories for NPCs
+    // Assign starting territories
+    map['north_america'] = { controlledBy: 'player', hasPlayerMilitary: true };
     map['western_europe'] = { controlledBy: 'western_alliance', hasPlayerMilitary: false };
     map['east_asia'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false };
     map['eastern_europe'] = { controlledBy: 'eastern_alliance', hasPlayerMilitary: false };
     return map as WorldMap;
 };
 
-const INITIAL_STATS: Omit<GameStats, 'nationName' | 'emblemImageUrl' | 'worldMap' | 'policies'> = { 
+const INITIAL_STATS: GameStats = { 
     military: { infantry: 500000, armor: 5000, navy: 500, airforce: 1000 },
     economy: 2000, // Billions USD
     manpower: 10000000,
     morale: 70, 
     diplomacy: 60,
     economicGrowth: 0.5, // Starting growth rate
+    worldMap: createInitialMap(), 
+    policies: [], 
+    nationName: '', 
+    emblemImageUrl: null 
 };
 const MAX_MORALE_DIPLOMACY = 100;
-const SAVE_GAME_KEY = 'ww3-savegame-v3';
+const SAVE_GAME_KEY = 'ww3-savegame-v3'; // New key for map structure
 
-type GameState = 'menu' | 'setup' | 'playing' | 'gameOver';
+type GameState = 'menu' | 'naming' | 'playing' | 'gameOver';
 
 // Custom hook for the typing animation effect
 const useTypingEffect = (text: string = '', speed: number = 25): string => {
@@ -110,21 +114,15 @@ interface SavedGameData {
     eventLog: string[];
 }
 
-interface SetupData {
-    nationName: string;
-    nationalContext: string;
-    emblemImageUrl: string;
-    startingTerritory: RegionID;
-}
-
 const App: React.FC = () => {
-    const [stats, setStats] = useState<GameStats | null>(null);
+    const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
     const [turnData, setTurnData] = useState<TurnResponse | null>(null);
     const [eventLog, setEventLog] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [gameState, setGameState] = useState<GameState>('menu');
     const [gameOverMessage, setGameOverMessage] = useState('');
     const [playerInput, setPlayerInput] = useState('');
+    const [tempNationName, setTempNationName] = useState('');
     const [hasSaveGame, setHasSaveGame] = useState(false);
     const audioInitialized = useRef(false);
     const animatedScenario = useTypingEffect(isLoading ? '' : turnData?.scenario);
@@ -147,7 +145,7 @@ const App: React.FC = () => {
     };
 
     const saveGame = (currentStats: GameStats, currentTurnData: TurnResponse | null, currentEventLog: string[]) => {
-        if (!currentTurnData || !currentStats) return;
+        if (!currentTurnData) return;
         const gameData: SavedGameData = { stats: currentStats, turnData: currentTurnData, eventLog: currentEventLog };
         localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(gameData));
         setHasSaveGame(true);
@@ -173,7 +171,7 @@ const App: React.FC = () => {
                 } else {
                     // Old save data, start new game
                     clearSaveGame();
-                    setGameState('setup');
+                    setGameState('naming');
                 }
             } catch {
                 clearSaveGame();
@@ -183,7 +181,8 @@ const App: React.FC = () => {
         }
     };
 
-    const handleNationCreation = useCallback(async (setupData: SetupData) => {
+    const handleNationCreation = useCallback(async () => {
+        if (!tempNationName.trim() || isLoading) return;
         playSoundWithInit('start_game');
         clearSaveGame();
         setIsLoading(true);
@@ -191,26 +190,15 @@ const App: React.FC = () => {
         setEventLog([]);
         setPlayerInput('');
     
-        const newMap = createInitialMap();
-        Object.values(newMap).forEach(region => region.hasPlayerMilitary = false);
-        newMap[setupData.startingTerritory].controlledBy = 'player';
-        newMap[setupData.startingTerritory].hasPlayerMilitary = true;
-    
-        let baseStats: GameStats = { 
-            ...INITIAL_STATS, 
-            nationName: setupData.nationName,
-            emblemImageUrl: setupData.emblemImageUrl,
-            nationalContext: setupData.nationalContext,
-            worldMap: newMap,
-            policies: []
-        };
+        let currentStats: GameStats = { ...INITIAL_STATS, nationName: tempNationName, emblemImageUrl: null };
+        setStats(currentStats);
         
-        // Use generateNationalEmblem only if the user uploaded a custom image and it needs processing,
-        // otherwise the setupData.emblemImageUrl is already what we need (a data URL).
-        // For simplicity, we assume emblem is passed ready-to-use. A real app might handle upload processing here.
-        const initialTurn = await getNextTurn(baseStats, null);
+        const [emblemUrl, initialTurn] = await Promise.all([
+            generateNationalEmblem(tempNationName),
+            getNextTurn(currentStats, null)
+        ]);
     
-        const currentStats = { ...baseStats, policies: [initialTurn.policySummary] };
+        currentStats = { ...currentStats, emblemImageUrl: emblemUrl, policies: [initialTurn.policySummary] };
         setStats(currentStats);
         setTurnData(initialTurn);
         const newLog = [initialTurn.outcome];
@@ -219,19 +207,20 @@ const App: React.FC = () => {
         saveGame(currentStats, initialTurn, newLog);
         setIsLoading(false);
         playSoundWithInit('receive_response');
-    }, []);
+    }, [tempNationName, isLoading]);
 
     const resetGame = () => {
         playSoundWithInit('ui_click');
         clearSaveGame();
-        setStats(null);
+        setStats(INITIAL_STATS);
         setGameState('menu');
         setTurnData(null);
         setEventLog([]);
+        setTempNationName('');
     }
 
     const handleAction = useCallback(async () => {
-        if (isLoading || gameState !== 'playing' || !playerInput.trim() || !stats) return;
+        if (isLoading || gameState !== 'playing' || !playerInput.trim()) return;
 
         playSoundWithInit('send_command');
         setIsLoading(true);
@@ -322,19 +311,24 @@ const App: React.FC = () => {
                                 <Icon name="load" className="w-6 h-6"/> Tiếp tục chiến dịch
                             </button>
                         )}
-                        <button onClick={() => { playSoundWithInit('ui_click'); setGameState('setup'); }} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
+                        <button onClick={() => { playSoundWithInit('ui_click'); setGameState('naming'); }} className="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105">
                             <Icon name="play" className="w-6 h-6"/> {hasSaveGame ? 'Chiến dịch mới' : 'Bắt đầu chiến dịch'}
                         </button>
                     </div>
                 </div>
             );
             
-            case 'setup': return (
-                <GameSetup 
-                    onSetupComplete={handleNationCreation}
-                    onBackToMenu={() => setGameState('menu')}
-                    isLoading={isLoading}
-                />
+            case 'naming': return (
+                <div className="text-center flex flex-col items-center justify-center min-h-[400px]">
+                    <h2 className="text-3xl font-bold text-gray-200 mb-4 animate-slide-in-up">Đặt tên cho quốc gia của bạn</h2>
+                    <p className="text-gray-400 mb-8 max-w-md animate-slide-in-up" style={{ animationDelay: '0.3s' }}>Tên quốc gia sẽ định hình vận mệnh và biểu tượng của dân tộc bạn.</p>
+                    <form onSubmit={(e) => { e.preventDefault(); handleNationCreation(); }} className="w-full max-w-sm flex flex-col gap-4 animate-slide-in-up" style={{ animationDelay: '0.5s' }}>
+                        <input type="text" value={tempNationName} onChange={(e) => setTempNationName(e.target.value)} placeholder="Ví dụ: Cộng hòa Astoria" className="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center text-xl" autoFocus />
+                        <button type="submit" disabled={!tempNationName.trim()} className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <Icon name="play" className="w-6 h-6"/> Bắt đầu
+                        </button>
+                    </form>
+                 </div>
             );
 
             case 'gameOver': return (
@@ -348,7 +342,6 @@ const App: React.FC = () => {
             );
             
             case 'playing':
-                if (!stats) return null; // Should not happen in 'playing' state
                 const isTyping = animatedScenario.length < (turnData?.scenario || '').length;
                 return (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in">

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ArmyCorps, RegionID } from '../types';
 import { Icon } from './icons';

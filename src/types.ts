@@ -1,10 +1,6 @@
+
 // Factions controlling territories
-export type FactionID = 
-    | 'player' // Used in single-player
-    | 'eastern_alliance' 
-    | 'western_alliance' 
-    | 'neutral'
-    | string; // Allows for player IDs like 'player1', 'player2' in multiplayer
+export type FactionID = 'player' | 'player_alliance' | 'eastern_alliance' | 'western_alliance' | 'neutral';
 
 // Definable regions on the world map
 export type RegionID = 
@@ -34,17 +30,15 @@ export interface ArmyCorps {
     id: string;
     name: string;
     location: RegionID;
-    composition: Partial<MilitaryStats>;
+    composition: MilitaryStats;
 }
 
 export interface RegionState {
     controlledBy: FactionID;
-    fortificationLevel: number;
-    strategicResource?: StrategicResource;
+    militaryPresence?: Partial<MilitaryStats>; // Troops stationed in the region
+    fortificationLevel: number; // e.g., 1-5
+    strategicResource?: StrategicResource | null;
     isContested: boolean;
-    // Military presence is now tracked per-player in multiplayer
-    hasPlayerMilitary?: boolean; // Kept for single-player
-    militaryPresence?: FactionID[]; // For multiplayer
 }
 
 export type WorldMap = Record<RegionID, RegionState>;
@@ -52,31 +46,32 @@ export type WorldMap = Record<RegionID, RegionState>;
 export interface MapChange {
     region: RegionID;
     newController?: FactionID;
-    // Single-player specific
-    playerMilitary?: boolean; 
-    // Multiplayer specific
-    addMilitaryPresence?: FactionID;
-    removeMilitaryPresence?: FactionID;
+    militaryPresence?: Partial<MilitaryStats>; // New troop numbers in the region after events
+    fortificationLevel?: number;
+    isContested?: boolean;
 }
 
-// --- SINGLE PLAYER ---
-export interface SinglePlayerGameStats {
+export interface ArmyCorpsChange {
+    action: 'CREATE' | 'UPDATE' | 'DELETE';
+    corps: Partial<ArmyCorps> & { id: string }; // For DELETE, only id is needed. For UPDATE, id and changed fields. For CREATE, full object.
+}
+
+export interface GameStats {
+    armyCorps: ArmyCorps[];
+    economy: number; // In billions USD
+    manpower: number; // Total available personnel
+    morale: number; // 0-100 scale
+    diplomacy: number; // 0-100 scale
+    economicGrowth: number; // Percentage
+    worldMap: WorldMap; 
+    policies: string[];
     nationName: string;
     emblemImageUrl: string | null;
-    nationalContext?: string;
-    military: MilitaryStats;
-    economy: number;
-    manpower: number;
-    morale: number;
-    diplomacy: number;
-    economicGrowth: number;
-    worldMap: WorldMap;
-    policies: string[];
-    armyCorps: ArmyCorps[];
+    allianceName?: string;
 }
 
-export interface SinglePlayerStatChanges {
-    military: Partial<MilitaryStats>;
+export interface StatChanges {
+    armyCorpsChanges: ArmyCorpsChange[];
     economy: number;
     manpower: number;
     morale: number;
@@ -85,53 +80,12 @@ export interface SinglePlayerStatChanges {
     mapChanges: MapChange[];
 }
 
-export interface SinglePlayerTurnResponse {
+export interface TurnResponse {
     scenario: string;
     outcome: string;
-    statChanges: SinglePlayerStatChanges;
+    statChanges: StatChanges;
     policySummary: string;
     worldStatus: string;
     damageReport: string;
-}
-
-// --- MULTIPLAYER ---
-export interface Player {
-    id: string; // e.g., 'player1'
-    nationName: string;
-    emblemImageUrl: string | null;
-    isReady: boolean;
-    nationalContext?: string;
-    military: MilitaryStats;
-    economy: number;
-    manpower: number;
-    morale: number;
-    diplomacy: number;
-    economicGrowth: number;
-    policies: string[];
-    armyCorps: ArmyCorps[];
-}
-
-export interface MultiplayerGameStats {
-    gameId: string;
-    turn: number;
-    players: Player[];
-    worldMap: WorldMap;
-    activePlayerId: string;
-    isStarted: boolean;
-    isGameOver: boolean;
-    winnerId?: string;
-    gameLog: string[];
-}
-
-export interface ChatMessage {
-    role: 'user' | 'model';
-    text: string;
-}
-
-// --- SETUP ---
-export interface SetupData {
-    nationName: string;
-    nationalContext: string;
-    emblemImageUrl: string;
-    startingTerritory: RegionID;
+    allianceName?: string;
 }

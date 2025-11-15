@@ -37,24 +37,12 @@ const LegendItem: React.FC<{ colorClass: string, name: string }> = ({ colorClass
     </div>
 );
 
-interface WorldMapProps {
-    mapData: WorldMapData;
-    onRegionClick?: (region: RegionID) => void;
-    selectableRegions?: RegionID[];
-    selectedRegion?: RegionID | null;
-}
-
-export const WorldMap: React.FC<WorldMapProps> = ({ 
-    mapData, 
-    onRegionClick = () => {}, 
-    selectableRegions = [], 
-    selectedRegion = null 
-}) => {
+export const WorldMap: React.FC<{ mapData: WorldMapData }> = ({ mapData }) => {
     const playerMilitaryRegion = Object.keys(mapData).find(key => mapData[key as RegionID].hasPlayerMilitary) as RegionID | undefined;
 
     return (
         <div className="mt-4 flex flex-col items-center">
-            <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢỢC TOÀN CẦU</h3>
+            <h3 className="text-sm font-bold text-gray-400 mb-2">BẢN ĐỒ CHIẾN LƯỢC TOÀN CẦU</h3>
             <div className="bg-gray-900/50 p-2 rounded-md w-full">
                 <svg viewBox="0 0 560 210" className="w-full h-auto">
                     <defs>
@@ -70,21 +58,14 @@ export const WorldMap: React.FC<WorldMapProps> = ({
                         const regionId = key as RegionID;
                         const region = REGION_DATA[regionId];
                         const faction = mapData[regionId]?.controlledBy || 'neutral';
-                        const isSelectable = selectableRegions.includes(regionId);
-                        const isSelected = selectedRegion === regionId;
-                        
                         return (
-                            <g 
-                                key={regionId} 
-                                className={`group ${isSelectable ? 'cursor-pointer' : ''}`}
-                                onClick={() => isSelectable && onRegionClick(regionId)}
-                            >
+                            <g key={regionId} className="group">
                                 <path
                                     d={region.path}
-                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 ${isSelectable ? 'group-hover:stroke-white' : ''} ${isSelected ? 'stroke-yellow-400' : ''}`}
-                                    strokeWidth={isSelected ? "2.5" : "1.5"}
+                                    className={`${FACTION_COLORS[faction]} transition-all duration-300 group-hover:stroke-white`}
+                                    strokeWidth="1.5"
                                 />
-                                <title>{`${region.name} - ${isSelectable ? 'Có thể chọn' : `Kiểm soát bởi: ${FACTION_NAMES[faction]}`}`}</title>
+                                <title>{`${region.name} - Kiểm soát bởi: ${FACTION_NAMES[faction]}`}</title>
                             </g>
                         );
                     })}

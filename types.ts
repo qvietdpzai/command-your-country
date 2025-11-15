@@ -47,7 +47,6 @@ export interface GameStats {
     policies: string[];
     nationName: string;
     emblemImageUrl: string | null;
-    nationalContext?: string;
 }
 
 export interface StatChanges {
